@@ -1,0 +1,58 @@
+---
+title: 'Avatar: The Last Airbender Analysis'
+author: "Nick Cruickshank"
+date: "9/24/2020"
+output: github_document:
+  toc: true
+  toc_depth: 2
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Load Information
+
+```{r load libraries, message=FALSE, warning=FALSE}
+# load libraries
+library(readr)
+library(tidyverse)
+```
+
+```{r load data, message=FALSE, warning=FALSE}
+# load data
+avatar <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-08-11/avatar.csv')
+scene_description <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-08-11/scene_description.csv')
+```
+
+
+```{r}
+# create ep list
+eps <- avatar %>%
+  distinct(book, book_num, chapter, chapter_num, writer, director, imdb_rating) %>%
+  #mutate(writer = str_remove(writer, "<U+200E>")) %>%
+  separate(writer, into = c("writer1","writer2","writer3","writer4","writer5",
+                            "writer6","writer7","writer8","writer9","writer10"),
+           sep = ", ")
+# for each character, create a column with percent of spoke lines
+```
+
+# Describe DF
+
+```{r}
+avatar %>% head()
+```
+
+# Exploratory Analysis
+
+## Episode Breakdown by IMDB Rating
+
+```{r}
+# create a graph visualizing the episodes by imbd_rating
+eps %>%
+  ggplot(aes(book_num, chapter_num)) + 
+  geom_tile(aes(fill = imdb_rating)) + 
+  scale_fill_viridis_c(option = "plasma")
+```
+
+
