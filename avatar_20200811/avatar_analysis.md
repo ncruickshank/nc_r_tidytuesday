@@ -1,17 +1,11 @@
----
-title: 'Avatar: The Last Airbender Analysis'
-author: "Nick Cruickshank"
-date: "9/24/2020"
-output: github_document
----
-
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
+Avatar: The Last Airbender Analysis
+================
+Nick Cruickshank
+9/24/2020
 
 # Load Information
 
-```{r load libraries, message=FALSE, warning=FALSE}
+``` r
 # load libraries
 library(glue)
 library(readr)
@@ -19,14 +13,13 @@ library(tidyverse)
 library(shadowtext)
 ```
 
-```{r load data, message=FALSE, warning=FALSE}
+``` r
 # load data
 avatar <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-08-11/avatar.csv')
 scene_description <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-08-11/scene_description.csv')
 ```
 
-
-```{r tidy df, message=FALSE, warning=FALSE}
+``` r
 # create ep list
 eps <- avatar %>%
   distinct(book, book_num, chapter, chapter_num, writer, director, imdb_rating) %>%
@@ -41,15 +34,26 @@ books <- unique(avatar$book)
 
 # Describe DF
 
-```{r}
+``` r
 avatar %>% head()
 ```
+
+    ## # A tibble: 6 x 11
+    ##      id book  book_num chapter chapter_num character full_text character_words
+    ##   <dbl> <chr>    <dbl> <chr>         <dbl> <chr>     <chr>     <chr>          
+    ## 1     1 Water        1 The Bo~           1 Katara    "Water. ~ Water. Earth. ~
+    ## 2     2 Water        1 The Bo~           1 Scene De~ "As the ~ <NA>           
+    ## 3     3 Water        1 The Bo~           1 Sokka     "It's no~ It's not getti~
+    ## 4     4 Water        1 The Bo~           1 Scene De~ "The sho~ <NA>           
+    ## 5     5 Water        1 The Bo~           1 Katara    "[Happil~ Sokka, look!   
+    ## 6     6 Water        1 The Bo~           1 Sokka     "[Close-~ Sshh! Katara, ~
+    ## # ... with 3 more variables: writer <chr>, director <chr>, imdb_rating <dbl>
 
 # Exploratory Analysis
 
 ## Episode Breakdown by IMDB Rating
 
-```{r}
+``` r
 # worst episode
 worst_ep <- eps %>%
   arrange(imdb_rating) %>%
@@ -69,8 +73,7 @@ best_chap <- best_ep$chapter
 best_chap_rating <- best_ep$imdb_rating
 ```
 
-
-```{r episode breakdown, fig.height=8, fig.width=7, message=FALSE, warning=FALSE}
+``` r
 # create a graph visualizing the episodes by imbd_rating
 eps %>%
   ggplot(aes(book_num, chapter_num)) + 
@@ -95,4 +98,4 @@ eps %>%
   )
 ```
 
-
+![](avatar_analysis_files/figure-gfm/episode%20breakdown-1.png)<!-- -->
