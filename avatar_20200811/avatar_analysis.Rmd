@@ -9,14 +9,19 @@ output: github_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-# Load Information
+## Load Information
 
 ```{r load libraries, message=FALSE, warning=FALSE}
 # load libraries
+library(extrafont)
+library(forcats)
 library(glue)
+library(ngram)
 library(readr)
-library(tidyverse)
 library(shadowtext)
+library(tidyverse)
+library(tvthemes)
+loadfonts(device = "win")
 ```
 
 ```{r load data, message=FALSE, warning=FALSE}
@@ -39,15 +44,15 @@ eps <- avatar %>%
 books <- unique(avatar$book)
 ```
 
-# Describe DF
+## Describe DF
 
 ```{r}
-avatar %>% head()
+knitr::kable(avatar %>% head())
 ```
 
-# Exploratory Analysis
+## Exploratory Analysis
 
-## Episode Breakdown by IMDB Rating
+### Episode Breakdown by IMDB Rating
 
 ```{r}
 # worst episode
@@ -76,7 +81,6 @@ eps %>%
   ggplot(aes(book_num, chapter_num)) + 
   geom_tile(aes(fill = imdb_rating), color = "black") + 
   scale_fill_viridis_c(option = "plasma") + 
-  #geom_text(aes(label = chapter), size = 2.5, color = "white") + 
   geom_shadowtext(aes(label = chapter), size = 2.5) + 
   labs(
     title = "Avatar Episode IMDb Ratings",
@@ -86,7 +90,8 @@ eps %>%
     y = "Chapter",
     fill = "IMBd Rating"
   ) +
-  theme_minimal() +
+  theme_avatar(title.font = "Herculanum",
+               text.font = "Herculanum") + 
   theme(
     legend.position = c(0.2,0.96),
     legend.direction = "horizontal",
@@ -95,4 +100,67 @@ eps %>%
   )
 ```
 
+### Director and Writer Analysis
 
+Which directors or writers were associated with the most succesful episodes of Avatar?
+
+### "Cabbages" Trending
+
+Track the running joke for the "MY CABBAGES" joke.
+
+### Zuko Transformation Analysis
+
+## Machine Learning: Predict IMDb score based on characters
+
+For each line of each episode, create a column which counts the number of words (excluding stop words?) that line contains.
+
+```{r create df for word count by character, message=FALSE, warning=FALSE}
+# define strings to trim from dataset.
+intro1 <- "Water. Earth. Fire. Air. My grandmother used to tell me"
+intro2 <- "Long ago, the four nations lived together in harmony."
+
+character_words <- avatar %>%
+  filter(!(grepl(c(intro1,intro2), character_words)),
+         character != "Scene Description") %>%
+  group_by(book, book_num, chapter, chapter_num, character, writer, director, imdb_rating) %>%
+  dplyr::summarise(
+    words = wordcount(character_words)
+  )
+  #mutate(words = wordcount(character_words)) #doesn't work right, appears to work within a summarise
+```
+
+```{r word count distribution, message=FALSE, warning=FALSE}
+main_characters <- c("Aang", "Azula", "Iroh", "Katara", "Ozai", "Sokka", "Toph", "Zuko")
+
+font_import(pattern = "h", paths = "C:\\Windows\\Fonts\\")
+
+character_words %>%
+  filter(character %in% main_characters) %>%
+  group_by(book, character) %>%
+  dplyr::summarise(
+    total_words = sum(words)
+  ) %>%
+  ggplot(aes(fct_reorder(character, total_words, .desc = TRUE), total_words)) + 
+  geom_bar(aes(fill = book), stat = "identity", color = "black") + 
+  scale_fill_manual(values = c(
+    "Earth" = "tan4",
+    "Fire" = "firebrick",
+    "Water" = "royalblue2"
+  )) +
+  labs(
+    title = "Avatar: Word Count By Character",
+    x = "Character",
+    y = "Total Words"
+  ) +
+  theme_avatar(title.font = "Herculanum",
+               text.font = "Herculanum")
+```
+
+
+Pivot the dataframe wider, so each character gets a column whose values are the number of words they had in the episode.
+
+Apply the same logic for each writer and director, but instead the column is boolean (i.e. If writer one is in s1e1, than the column value is 1 for that episode, else 0).
+
+Train-test split the resulting dataframe, with IMDb rating as the y-value.
+
+Assess numerous different models for accuracy.
