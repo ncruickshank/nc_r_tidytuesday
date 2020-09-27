@@ -132,7 +132,7 @@ character_words <- avatar %>%
 ```{r word count distribution, message=FALSE, warning=FALSE}
 main_characters <- c("Aang", "Azula", "Iroh", "Katara", "Ozai", "Sokka", "Toph", "Zuko")
 
-font_import(pattern = "h", paths = "C:\\Windows\\Fonts\\")
+#font_import(pattern = "h", paths = "C:\\Windows\\Fonts\\")
 
 character_words %>%
   filter(character %in% main_characters) %>%
