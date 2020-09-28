@@ -47,7 +47,7 @@ books <- unique(avatar$book)
 ## Describe DF
 
 ```{r}
-knitr::kable(avatar %>% head())
+knitr::kable(avatar %>% head(1))
 ```
 
 ## Exploratory Analysis
@@ -110,7 +110,7 @@ Track the running joke for the "MY CABBAGES" joke.
 
 ### Zuko Transformation Analysis
 
-## Machine Learning: Predict IMDb score based on characters
+## Which characters had the most lines?
 
 For each line of each episode, create a column which counts the number of words (excluding stop words?) that line contains.
 
@@ -132,7 +132,8 @@ character_words <- avatar %>%
 ```{r word count distribution, message=FALSE, warning=FALSE}
 main_characters <- c("Aang", "Azula", "Iroh", "Katara", "Ozai", "Sokka", "Toph", "Zuko")
 
-#font_import(pattern = "h", paths = "C:\\Windows\\Fonts\\")
+font_import(pattern = "herculanum.ttf", paths = "C:\\Windows\\Fonts\\", prompt = F)
+#font_import(prompt = F)
 
 character_words %>%
   filter(character %in% main_characters) %>%
@@ -164,3 +165,31 @@ Apply the same logic for each writer and director, but instead the column is boo
 Train-test split the resulting dataframe, with IMDb rating as the y-value.
 
 Assess numerous different models for accuracy.
+
+## Machine Learning
+
+Inspired by Julia Silge: https://juliasilge.com/blog/lasso-the-office/
+
+```{r}
+remove_regex <- "[:punct:]|[:digit:]|parts |parts |part |the |and" # be careful defining this
+
+# create df to tidy up chapter names
+avatar_info <- avatar %>%
+  mutate(
+    chap = str_to_lower(chapter),
+    chap = str_remove_all(chap, remove_regex),
+    chap = str_trim(chap),
+    imdb_rating
+  )
+
+avatar_info
+```
+
+How many times did each character speak per episode?
+
+```{r}
+avatar_info %>%
+  count(chap, character) %>%
+  add_count(character, wt = n, name = "character_count")
+```
+
