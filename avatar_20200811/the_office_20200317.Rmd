@@ -1,0 +1,445 @@
+---
+title: "the_office_20200317"
+author: "Nick Cruickshank"
+date: "5/20/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(schrute)
+library(forcats)
+```
+
+```{r Tidy Data, include=FALSE}
+office <- schrute::theoffice
+
+ep_summary <- office %>%
+  group_by(season, episode) %>%
+  distinct(writer, director, imdb_rating, episode_name)
+```
+
+# Personal Exploration
+
+What are the average IMDB scores for each season?
+
+```{r Season IMDB Rating Distribution}
+office %>%
+  ggplot(aes(season, imdb_rating)) + 
+  geom_boxplot(aes(group = season))
+```
+
+Which directors were responsible for the highest rated episodes?
+
+```{r Director Summary Table}
+ep_summary %>%
+  group_by(director) %>%
+  summarize(number_episodes = n(),
+            average_rating = mean(imdb_rating),
+            min_rating = min(imdb_rating),
+            max_rating = max(imdb_rating)) %>%
+  filter(number_episodes >= 5) %>%
+  arrange(desc(average_rating)) %>%
+  head(10) %>%
+  ggplot(aes(fct_reorder(director, average_rating, .desc = TRUE), average_rating)) + 
+  geom_bar(fill = "blue", stat = "identity") + 
+  geom_errorbar(aes(ymin = min_rating, ymax = max_rating)) +
+  theme(axis.text.x = element_text(angle = 60, hjust = 1)) + 
+  labs(title = "Top 10 Directors of The Office",
+       subtitle = "Rankings based on average episode IMDB rating.",
+       x = "Director",
+       y = "Average Episode IMDB Rating",
+       caption = "Error bars represent range of lowest rated episode to highest rated episode.")
+```
+
+# Julia Silge Analysis
+
+https://juliasilge.com/blog/lasso-the-office/
+
+Modelling goal is to predict the IMDB ratings for episodes of The Office based on characteristics of the episodes in the #TidyTuesday dataset.
+
+## Explore the data
+
+```{r}
+library(tidyverse)
+library(janitor)
+library(schrute)
+library(tidymodels)
+
+ratings_raw <- readr::read_csv("https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-03-17/office_ratings.csv")
+
+remove_regex <- "[:punct:]|[:digit:]|parts |part |the |and"
+
+office_ratings <- ratings_raw %>%
+  transmute(
+    episode_name = str_to_lower(title),
+    episode_name = str_remove_all(episode_name, remove_regex),
+    episode_name = str_trim(episode_name),
+    imdb_rating
+  )
+
+office_info <- schrute::theoffice %>%
+  mutate(
+    season = as.numeric(season),
+    episode = as.numeric(episode),
+    episode_name = str_to_lower(episode_name),
+    episode_name = str_remove_all(episode_name, remove_regex),
+    episode_name = str_trim(episode_name)
+  ) %>%
+  select(season, episode, episode_name, director, writer, character)
+
+office_info
+```
+
+How many times do each character speak per episode?
+
+```{r}
+characters <- office_info %>%
+  count(episode_name, character) %>%
+  add_count(character, wt = n, name = 'character_count') %>%
+  filter(character_count > 800) %>%
+  select(-character_count) %>%
+  pivot_wider(
+    names_from = character,
+    values_from = n,
+    values_fill = list(n= 0)
+  )
+
+characters
+```
+
+Which directors and writers were involvedin each episode? 
+
+_Note to Self_:
+
+ * You can separate multiple inputs in a cell by using separate_rows by whatever is separating the values (in this case ";").
+ * pivot_longer and pivot_wider also help to this end.
+
+```{r}
+creators <- office_info %>%
+  distinct(episode_name, director, writer) %>%
+  pivot_longer(director:writer, names_to = "role", values_to = "person") %>%
+  separate_rows(person, sep = ";") %>%
+  add_count(person) %>%
+  filter(n > 10) %>%
+  distinct(episode_name, person) %>%
+  mutate(person_value = 1) %>%
+  pivot_wider(
+    names_from = person,
+    values_from = person_value,
+    values_fill = list(person_value = 0)
+  )
+
+creators
+```
+
+Find season and episode number for each episode. Join tables for trending.
+
+```{r}
+office <- office_info %>%
+  distinct(season, episode, episode_name) %>%
+  inner_join(characters) %>%
+  inner_join(creators) %>%
+  inner_join(office_ratings %>%
+               select(episode_name, imdb_rating)) %>%
+  janitor::clean_names()
+
+office
+```
+
+visualize
+
+```{r}
+office %>%
+  ggplot(aes(episode, imdb_rating, fill = as.factor(episode))) + 
+  geom_boxplot(show.legend = FALSE)
+```
+
+# Train a Model
+
+Split model into training and testing sets.
+
+```{r}
+office_split <- initial_split(office, strata = season)
+office_train <- training(office_split)
+office_test <- testing(office_split)
+```
+
+Build recipe for data preprocessing:
+
+ * Tell recipe() what the model is going to be and what out training data is.
+ * Update role of episode_name. We might like to keep this around for convenience for ID-ing rows.
+ * remove numeric variables that have zero variance.
+ * normalize (center and scale) the numeric variables. Important for lasso regularization.
+
+office_rec = recipe that has __not__ been training by the data yet.
+office_prep = object that __has__ been trained on data.
+
+```{r}
+office_rec <- recipe(imdb_rating ~ ., data = office_train) %>% 
+  update_role(episode_name, new_role = "ID") %>%
+  step_zv(all_numeric(), -all_outcomes()) %>%
+  step_normalize(all_numeric(), -all_outcomes())
+
+office_prep <- office_rec %>%
+  prep(string_as_factors = FALSE)
+```
+
+Now we __specificy__ and __fit__ our models. One model is set up for lasso regression. 
+
+```{r}
+lasso_spec <- linear_reg(penalty = 0.1, mixture = 1) %>%
+  set_engine("glmnet")
+
+wf <- workflow() %>%
+  add_recipe(office_rec)
+
+lasso_fit <- wf %>%
+  add_model(lasso_spec) %>%
+  fit(data = office_train)
+
+lasso_fit %>%
+  pull_workflow_fit() %>%
+  tidy()
+```
+
+# Tune lasso parameters
+
+fine tune the penalty parameter.
+
+```{r}
+set.seed(1234)
+office_boot <- bootstraps(office_train, strata = season)
+
+tune_spec <- linear_reg(penalty = tune(), mixture = 1) %>%
+  set_engine("glmnet")
+
+lambda_grid <- grid_regular(penalty(), levels = 50)
+```
+
+tune the grid using workflow object.
+
+```{r}
+doParallel::registerDoParallel()
+
+set.seed(2020)
+lasso_grid <- tune_grid(
+  wf %>% add_model(tune_spec),
+  resamples = office_boot,
+  grid = lambda_grid
+)
+
+lasso_grid %>%
+  collect_metrics()
+```
+
+visualize performance of regularization parameter.
+
+```{r}
+lasso_grid %>%
+  collect_metrics() %>%
+  ggplot(aes(penalty, mean, color = .metric)) + 
+  geom_errorbar(aes(
+    ymin = mean - std_err,
+    ymax = mean + std_err
+  ),
+  alpha = 0.5
+  ) +
+  geom_line(size = 1.5) +
+  facet_wrap(~.metric, scales = "free", nrow = 2) +
+  scale_x_log10() +
+  theme(legend.position = "none")
+```
+
+update workflow with information from visual.
+
+```{r}
+lowest_rmse <- lasso_grid %>%
+  select_best("rmse", maximize = FALSE)
+
+final_lasso <- finalize_workflow(
+  wf %>% add_model(tune_spec),
+  lowest_rmse
+)
+```
+
+fit finalized workflow on training data.
+
+```{r}
+library(vip)
+
+final_lasso %>%
+  fit(office_train) %>%
+  pull_workflow_fit() %>%
+  vi(lambda = lowest_rmse$penalty) %>%
+  mutate(
+    Importance = abs(Importance),
+    Variable = fct_reorder(Variable, Importance)
+  ) %>%
+  ggplot(aes(x = Importance, y = Variable, fill = Sign)) +
+  geom_col() +
+  scale_x_continuous(expand = c(0, 0)) +
+  labs(y = NULL)
+```
+
+test data
+
+```{r}
+last_fit(
+  final_lasso,
+  office_split
+) %>%
+  collect_metrics()
+```
+
+# Jake Lawlor "That's What She Said" Analysis
+
+https://github.com/jakelawlor/TidyTuesday_JL/blob/master/CodeFiles/Mar17.20.office.R
+
+## Set Up
+```{r Libraries, message=FALSE, warning=FALSE, include=FALSE}
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(schrute)
+library(waffle)
+library(cowplot)
+library(patchwork)
+```
+
+```{r Import Data}
+office_ratings <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-03-17/office_ratings.csv')
+
+mydata <- schrute::theoffice
+```
+
+```{r Tidy Data}
+# change season to numbers
+mydata <- mydata %>%
+  mutate(season = as.numeric(season),
+         episode = as.numeric(episode),
+         title = episode_name)
+
+# remove weird characters
+mydata$character <- gsub("\"","",mydata$character)
+
+#find "that's what she said"
+shesaid <- mydata %>%
+  filter(grepl("that's what she said", tolower(text))) %>%
+  select(index, season, episode, episode_name, character, text, title) %>%
+  mutate(category = "shesaid") %>%
+  mutate(language = "english")
+
+hesaid <- mydata %>%
+  filter(grepl("that's what he said", tolower(text))) %>%
+  select(index, season, episode, episode_name, character, text, title) %>%
+  mutate(category = "hesaid") %>%
+  mutate(language = "english")
+
+hesaid2 <- mydata %>%
+  filter(grepl("eso es lo que dice", tolower(text))) %>%
+  select(index, season, episode, episode_name, character, text, title) %>%
+  mutate(category = "hesaid") %>%
+  mutate(language = "spanish")
+
+theysaid <- rbind(shesaid, hesaid, hesaid2) %>%
+  rbind(c(NA,8,NA,NA,NA,NA,NA,NA,NA))
+
+# some theme stuff
+bgcol <- "#f7f4ea"
+titlefont <- "Chalkboard Bold"
+subtitlefont <- "Chalkboard"
+legendfont <- "Helvetica Neue"
+theme_set(theme_classic())
+theme_update(
+  plot.background=element_rect(fill=bgcol,color=bgcol),
+  panel.background=element_blank()
+)
+```
+
+## TWSS bar graph by character
+
+```{r message=FALSE, warning=FALSE}
+characterspal <- c(
+                   "#b0ba77", # creed olive
+                   "#ebe7df", # david beige
+                   "#dec787", # dwight mustard
+                   "#fff3b5", # holly blonde
+                   "#854e82", # jan purple
+                   "#c7d0eb", # Jim light blue
+                   "#484959", # michael grey
+                   "#eba0b0" # pam rose,
+                  )
+
+bychar <- theysaid %>%
+  filter(complete.cases(.)) %>%
+  group_by(character) %>%
+  summarize(count = n()) %>%
+  mutate(character = case_when(character == "David" ~ "David Brent",
+                               TRUE ~ .$character))
+
+bychar %>%
+  ggplot() +
+  geom_bar(aes(character, count, fill = character),
+           stat = "identity", color = "grey20", size = .25) + 
+  scale_x_discrete(limits = rev(c("Michael","Dwight","Jim","Pam","Creed","David Brent","Holly","Jan"))) +
+  scale_fill_manual(values = (characterspal)) + 
+  geom_text(aes(label = character, x = character, y = count + .2),
+            hjust = 0, family = "American Typewriter") + 
+  guides(fill = F) + 
+  coord_flip(ylim = c(0,31), xlim = c(0.25, 8.75), expand = F) + 
+  labs(title='TWSS Jokes by Character',
+       subtitle="Michael Scott makes more TWSS jokes than all other characters combined")+
+  theme(text = element_text(family=titlefont),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank(),
+        axis.title=element_blank(),
+        axis.text=element_text(family=titlefont),
+        panel.background = element_blank(),
+        plot.margin = margin(10,10,10,10),
+        plot.title = element_text(size=12,family=titlefont),
+        plot.subtitle = element_text(size=10,family=subtitlefont))
+
+warnings()
+
+```
+
+## separate by gender
+
+```{r message=FALSE, warning=FALSE}
+# add columns for gender
+# jokes by gender
+
+donutpal <- c("#38818c","#aaa4b0")
+
+donut <- theysaid %>%
+  filter(complete.cases(.)) %>%
+  mutate(gender = case_when(character %in% c("Michael", "Dwight", "Jim", "Creed", "David") ~ "male",
+                            character %in% c("Pam", "Holly", "Jan") ~ "female")) %>%
+  group_by(gender) %>%
+  summarize(count = n()) %>%
+  mutate(percent = round(count / nrow(theysaid %>% filter(complete.cases(.))) * 100),
+         lab.pos = cumsum(percent) - 0.5*percent,
+         gender = factor(gender, levels = c("male", "female"))
+         ) %>%
+  ggplot(aes(2, percent)) + 
+  geom_bar(aes(2, fill = gender), stat = "identity", show.legend = F) + 
+  coord_polar("y", start = -250) + 
+  geom_text(aes(y = lab.pos, label = paste(percent, "%", sep = "")), col = c("white", "white")) + 
+  xlim(.15, 2.5) + 
+  theme_void() +
+  labs(title="Gender of Joke Maker",
+       subtitle = "Male characters tell almost 90% of TWSS jokes")+
+  scale_fill_manual(values = donutpal) +
+  theme(plot.title=element_text(family=titlefont,size=12),
+        plot.subtitle = element_text(family = subtitlefont,size=10),
+        panel.background = element_blank(),
+        plot.margin = margin(10,10,10,10),
+        plot.background = element_rect(fill=bgcol,color=bgcol))
+
+donut
+```
+
+
+
