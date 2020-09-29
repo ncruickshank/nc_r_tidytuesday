@@ -15,6 +15,7 @@ knitr::opts_chunk$set(echo = TRUE)
 # load libraries
 library(extrafont)
 library(forcats)
+library(glmnet)
 library(glue)
 library(janitor)
 library(ngram)
@@ -260,10 +261,46 @@ df %>%
 
 ## Training the model
 
+Perform initial split.
+
 ```{r}
 df_split <- initial_split(df, strata = book_num)
 df_train <- training(df_split)
 df_test <- training(df_split)
 ```
+
+Preprocessing. Mainly setting index.
+
+```{r}
+df_rec <- recipe(imdb_rating ~ ., data = df_train) %>%
+  update_role(c(book, book_num, chap, chapter_num), new_role = "ID") %>%
+  step_zv(all_predictors(), -all_outcomes()) %>% #replace all_numeric() with all_predictors() DOESN'T WORK
+  step_normalize(all_predictors(), -all_outcomes())
+
+df_prep <- df_rec %>%
+  prep(strings_as_factors = FALSE)
+
+#recipe(imdb_rating ~ ., data = df_train) %>%
+  #update_role(c(book, book_num, chap, chapter_num), new_role = "ID") %>%
+  #step_zv(all_predictors(), -all_outcomes()) 
+```
+
+```{r}
+lasso <- linear_reg(penalty = 0.1, mixture = 1) %>%
+  set_engine("glmnet")
+
+wf <- workflow() %>%
+  add_recipe(df_rec)
+
+#lasso_fit <- 
+  
+wf %>%
+  add_model(lasso) %>%
+  fit(data = df_train)
+
+lasso_fit %>%
+  pull_workflow_fit()
+```
+
 
 
