@@ -16,10 +16,12 @@ knitr::opts_chunk$set(echo = TRUE)
 library(extrafont)
 library(forcats)
 library(glue)
+library(janitor)
 library(ngram)
 library(readr)
 library(shadowtext)
 library(tidyverse)
+library(tidymodels)
 library(tvthemes)
 loadfonts(device = "win")
 ```
@@ -132,7 +134,7 @@ character_words <- avatar %>%
 ```{r word count distribution, message=FALSE, warning=FALSE}
 main_characters <- c("Aang", "Azula", "Iroh", "Katara", "Ozai", "Sokka", "Toph", "Zuko")
 
-font_import(pattern = "herculanum.ttf", paths = "C:\\Windows\\Fonts\\", prompt = F)
+#font_import(pattern = "herculanum.ttf", paths = "C:\\Windows\\Fonts\\", prompt = F)
 #font_import(prompt = F)
 
 character_words %>%
@@ -185,11 +187,83 @@ avatar_info <- avatar %>%
 avatar_info
 ```
 
+```{r}
+avatar_ratings <- avatar_info %>%
+  distinct(chap, imdb_rating)
+```
+
+
 How many times did each character speak per episode?
 
 ```{r}
-avatar_info %>%
+characters <- avatar_info %>%
   count(chap, character) %>%
-  add_count(character, wt = n, name = "character_count")
+  add_count(character, wt = n, name = "character_count") %>%
+  filter(character_count > 50,
+         character != "Scene Description") %>%
+  select(-character_count) %>%
+  pivot_wider(
+    names_from = character,
+    values_from = n,
+    values_fill = list(n = 0)
+    )
+
+characters
 ```
+
+Which writers/directors were involved in each episode?
+
+```{r}
+creators <- avatar_info %>%
+  distinct(chap, director, writer) %>%
+  pivot_longer(director:writer, names_to = "role", values_to = "person") %>%
+  separate_rows(person, sep = ",(\\s)?") %>%
+  add_count(person) %>%
+  filter(n > 1) %>%
+  distinct(chap, person) %>%
+  mutate(person_value = 1) %>%
+  pivot_wider(
+    names_from = person,
+    values_from = person_value,
+    values_fill = list(person_value = 0)
+  )
+
+creators
+```
+
+Join everything together
+
+```{r}
+df <- avatar_info %>%
+  distinct(book, book_num, chap, chapter_num) %>%
+  inner_join(characters) %>%
+  inner_join(creators) %>%
+  inner_join(avatar_ratings %>%
+               select(chap, imdb_rating)) %>%
+  janitor::clean_names()
+
+df
+```
+
+Some brief exploratory data analysis (EDA)
+
+```{r message=FALSE, warning=FALSE}
+df %>%
+  ggplot(aes(chapter_num, imdb_rating, fill = as.factor(chapter_num))) + 
+  geom_boxplot(show.legend = FALSE) + 
+  labs(
+    title  = "Prelim Avatar EDA"
+  ) + 
+  theme_avatar(title.font = "Herculanum",
+               text.font = "Herculanum")
+```
+
+## Training the model
+
+```{r}
+df_split <- initial_split(df, strata = book_num)
+df_train <- training(df_split)
+df_test <- training(df_split)
+```
+
 
