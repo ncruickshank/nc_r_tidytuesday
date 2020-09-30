@@ -243,6 +243,8 @@ df <- avatar_info %>%
                select(chap, imdb_rating)) %>%
   janitor::clean_names()
 
+df$imdb_rating[is.na(df$imdb_rating)] <- 9.4
+
 df
 ```
 
@@ -273,17 +275,26 @@ Preprocessing. Mainly setting index.
 
 ```{r}
 df_rec <- recipe(imdb_rating ~ ., data = df_train) %>%
-  update_role(c(book, book_num, chap, chapter_num), new_role = "ID") %>%
-  step_zv(all_predictors(), -all_outcomes()) %>% #replace all_numeric() with all_predictors() DOESN'T WORK
+  update_role(book, new_role = "ID") %>%
+  update_role(book_num, new_role = "ID") %>%
+  update_role(chap, new_role = "ID") %>%
+  update_role(chapter_num, new_role = "ID") %>%
+  step_zv(all_predictors(), -all_outcomes()) %>%
   step_normalize(all_predictors(), -all_outcomes())
 
 df_prep <- df_rec %>%
   prep(strings_as_factors = FALSE)
 
 #recipe(imdb_rating ~ ., data = df_train) %>%
-  #update_role(c(book, book_num, chap, chapter_num), new_role = "ID") %>%
-  #step_zv(all_predictors(), -all_outcomes()) 
+  #update_role(book, new_role = "ID") %>%
+  #update_role(book_num, new_role = "ID") %>%
+  #update_role(chap, new_role = "ID") %>%
+  #update_role(chapter_num, new_role = "ID") %>%
+  #step_zv(all_predictors(), -all_outcomes()) %>%
+  #step_normalize(all_predictors(), -all_outcomes())
 ```
+
+assign model (linear_reg lasso) and fit the training data to it.
 
 ```{r}
 lasso <- linear_reg(penalty = 0.1, mixture = 1) %>%
@@ -292,15 +303,69 @@ lasso <- linear_reg(penalty = 0.1, mixture = 1) %>%
 wf <- workflow() %>%
   add_recipe(df_rec)
 
-#lasso_fit <- 
-  
-wf %>%
+lasso_fit <- wf %>%
   add_model(lasso) %>%
   fit(data = df_train)
 
 lasso_fit %>%
-  pull_workflow_fit()
+  pull_workflow_fit() %>%
+  tidy()
 ```
 
+tune the lasso model
+
+define parameters to tune by
+
+```{r}
+set.seed(1494)
+df_boot <- bootstraps(df_train, stata = book_num)
+
+tune_spec <- linear_reg(penalty = tune(), mixture = 1) %>%
+  set_engine("glmnet")
+
+lambda_grid <- grid_regular(penalty(), levels = 50)
+```
+
+tune the grid using workflow objects
+
+```{r}
+doParallel::registerDoParallel()
+```
+
+```{r}
+set.seed(1994)
+
+# is this like GridSearchCV?
+lasso_grid <- tune_grid(
+  wf %>% add_model(tune_spec),
+  resamples = df_boot,
+  grid = lambda_grid
+)
+```
+
+Here are the results
+
+```{r}
+lasso_grid %>%
+  collect_metrics()
+```
+
+Visualize the results
+
+```{r}
+lasso_grid %>%
+  collect_metrics() %>%
+  ggplot(aes(penalty, mean, color = .metric)) + 
+  geom_errorbar(aes(
+    ymin = mean - std_err,
+    ymax = mean - std_err
+  ),
+  alpha = 0.5
+  ) + 
+  geom_line(size = 1.5) + 
+  facet_wrap(~.metric, scales = "free", nrow = 2) + 
+  scale_x_log10() + 
+  theme(legend.position = "none")
+```
 
 
