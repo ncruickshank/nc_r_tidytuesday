@@ -24,6 +24,7 @@ library(shadowtext)
 library(tidyverse)
 library(tidymodels)
 library(tvthemes)
+library(vip)
 loadfonts(device = "win")
 ```
 
@@ -365,7 +366,57 @@ lasso_grid %>%
   geom_line(size = 1.5) + 
   facet_wrap(~.metric, scales = "free", nrow = 2) + 
   scale_x_log10() + 
+  theme_avatar() +
   theme(legend.position = "none")
+
 ```
 
+select best penalty value
+
+```{r}
+lowest_rmse <- lasso_grid %>% 
+  select_best("rmse", maximize = FALSE)
+
+final_lasso <- finalize_workflow(
+  wf %>% add_model(tune_spec),
+  lowest_rmse
+)
+```
+
+finalize workflow and visualize training data
+
+```{r feature importance, fig.height=8, fig.width=8, message=FALSE, warning=FALSE}
+final_lasso %>%
+  fit(df_train) %>%
+  pull_workflow_fit() %>%
+  vi(lambda = lowest_rmse$penalty) %>%
+  mutate(
+    Importance = abs(Importance),
+    Variable = fct_reorder(Variable, Importance)
+  ) %>%
+  ggplot(aes(Importance, Variable, fill = Sign)) + 
+  geom_bar(stat = "Identity") + 
+  scale_fill_manual(values = c(
+    "NEG" = "firebrick",
+    "POS" = "forestgreen"
+  )) +
+  scale_x_continuous(expand = c(0,0)) + 
+  labs(
+    title = "Avatar the Last Airbender: Importance of Characters and Creators\non IMDb Rating",
+    subtitle = "Which characters should be featured most prominently?\nWhich creators should be involved?",
+    y = NULL
+    ) +
+  theme_avatar(title.font = "Herculanum",
+               text.font = "Herculanum")
+```
+
+fit model to test data
+
+```{r}
+last_fit(
+  final_lasso,
+  df_split
+  ) %>%
+  collect_metrics()
+```
 
