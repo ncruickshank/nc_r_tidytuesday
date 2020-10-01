@@ -134,7 +134,15 @@ eps %>%
     data = filter(eps, imdb_rating >= 9.4),
     aes(label = chapter),
     size = 3,
-    alpha = 0.5
+    alpha = 0.5,
+    color = "forestgreen"
+  ) +
+  ggrepel::geom_label_repel(
+    data = filter(eps, imdb_rating <= 7.8),
+    aes(label = chapter),
+    size = 3,
+    alpha = 0.5,
+    color = "firebrick"
   ) +
   labs(
     title = "Avatar the Last Airbender: IMDb Ratings by Epsiode",
