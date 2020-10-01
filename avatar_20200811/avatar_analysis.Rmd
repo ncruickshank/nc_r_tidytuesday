@@ -373,7 +373,7 @@ lasso_grid %>%
 
 select best penalty value
 
-```{r}
+```{r message=FALSE, warning=FALSE}
 lowest_rmse <- lasso_grid %>% 
   select_best("rmse", maximize = FALSE)
 
@@ -394,20 +394,25 @@ final_lasso %>%
     Importance = abs(Importance),
     Variable = fct_reorder(Variable, Importance)
   ) %>%
-  ggplot(aes(Importance, Variable, fill = Sign)) + 
-  geom_bar(stat = "Identity") + 
+  ggplot(aes(Variable, Importance)) + 
+  geom_bar(aes(fill = Sign), stat = "Identity") + 
   scale_fill_manual(values = c(
     "NEG" = "firebrick",
     "POS" = "forestgreen"
   )) +
-  scale_x_continuous(expand = c(0,0)) + 
+  coord_flip() + 
+  scale_y_continuous(expand = c(0,0)) + 
   labs(
-    title = "Avatar the Last Airbender: Importance of Characters and Creators\non IMDb Rating",
+    title = "Avatar the Last Airbender: Importance of Characters\nand Creators on IMDb Rating",
     subtitle = "Which characters should be featured most prominently?\nWhich creators should be involved?",
-    y = NULL
+    x = NULL,
+    caption = "Feature importance for IMDb rating evaluated based on lasso regression analysis."
     ) +
   theme_avatar(title.font = "Herculanum",
-               text.font = "Herculanum")
+               text.font = "Herculanum") + 
+  theme(
+    legend.position = c(0.9,0.1)
+  )
 ```
 
 fit model to test data
