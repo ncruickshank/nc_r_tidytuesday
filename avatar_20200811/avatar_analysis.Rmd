@@ -15,6 +15,7 @@ knitr::opts_chunk$set(echo = TRUE)
 # load libraries
 library(extrafont)
 library(forcats)
+library(ggrepel)
 library(glmnet)
 library(glue)
 library(janitor)
@@ -44,6 +45,8 @@ eps <- avatar %>%
                             "writer6","writer7","writer8","writer9","writer10"),
            sep = ", ")
 # for each character, create a column with percent of spoke lines
+
+eps$imdb_rating[is.na(eps$imdb_rating)] <- 9.4
 
 books <- unique(avatar$book)
 ```
@@ -116,16 +119,23 @@ Track the running joke for the "MY CABBAGES" joke.
 
 ### IMDb Ratings Over Time
 
-```{r ratings over time, fig.height=8, fig.width=10, message=FALSE, warning=FALSE}
+```{r ratings over time, fig.height=6, fig.width=10, message=FALSE, warning=FALSE}
 eps %>%
   mutate(chapter = fct_inorder(chapter)) %>%
   ggplot(aes(chapter, imdb_rating)) + 
-  geom_bar(aes(fill = book), stat = "identity") + 
-  scale_fill_manual(values = c(
-    "Earth" = "tan4",
+  geom_line(group = 1) + 
+  geom_point(aes(color = factor(book)), size = 2) +
+  scale_color_manual(values = c(
+    "Earth" = "tan2",
     "Fire" = "firebrick",
     "Water" = "royalblue2"
   )) +
+  ggrepel::geom_label_repel(
+    data = filter(eps, imdb_rating >= 9.4),
+    aes(label = chapter),
+    size = 3,
+    alpha = 0.5
+  ) +
   labs(
     title = "Avatar the Last Airbender: IMDb Ratings by Epsiode",
     x = "Chapter",
@@ -134,7 +144,10 @@ eps %>%
   theme_avatar(title.font = "Herculanum",
                text.font = "Herculanum") +
   theme(
-    axis.text.x = element_text(angle = 90, hjust = 1)
+    #axis.text.x = element_text(angle = 90, hjust = 1),
+    axis.text.x = element_blank(),
+    panel.grid.major.x = element_blank(),
+    legend.position = "none"
   )
 ```
 
