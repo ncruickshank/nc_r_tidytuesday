@@ -54,7 +54,7 @@ books <- unique(avatar$book)
 knitr::kable(avatar %>% head(1))
 ```
 
-## Exploratory Analysis
+## Exploratory Data Analysis
 
 ### Episode Breakdown by IMDB Rating
 
@@ -113,6 +113,31 @@ Which directors or writers were associated with the most succesful episodes of A
 Track the running joke for the "MY CABBAGES" joke.
 
 ### Zuko Transformation Analysis
+
+### IMDb Ratings Over Time
+
+```{r ratings over time, fig.height=8, fig.width=10, message=FALSE, warning=FALSE}
+eps %>%
+  mutate(chapter = fct_inorder(chapter)) %>%
+  ggplot(aes(chapter, imdb_rating)) + 
+  geom_bar(aes(fill = book), stat = "identity") + 
+  scale_fill_manual(values = c(
+    "Earth" = "tan4",
+    "Fire" = "firebrick",
+    "Water" = "royalblue2"
+  )) +
+  labs(
+    title = "Avatar the Last Airbender: IMDb Ratings by Epsiode",
+    x = "Chapter",
+    y = "IMDb Rating"
+  ) + 
+  theme_avatar(title.font = "Herculanum",
+               text.font = "Herculanum") +
+  theme(
+    axis.text.x = element_text(angle = 90, hjust = 1)
+  )
+```
+
 
 ## Which characters had the most lines?
 
