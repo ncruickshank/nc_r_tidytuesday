@@ -24,6 +24,7 @@ library(readr)
 library(shadowtext)
 library(tidyverse)
 library(tidymodels)
+library(tidytext)
 library(tvthemes)
 library(vip)
 loadfonts(device = "win")
@@ -160,6 +161,8 @@ eps %>%
 ```
 
 
+
+
 ## Which characters had the most lines?
 
 For each line of each episode, create a column which counts the number of words (excluding stop words?) that line contains.
@@ -207,6 +210,25 @@ character_words %>%
                text.font = "Herculanum")
 ```
 
+
+### Transcripts
+
+```{r message=FALSE, warning=FALSE}
+blacklist <- c("hey", "yeah", "guys", "gonna")
+
+script_words <- avatar %>%
+  add_count(character) %>%
+  filter(n >= 10) %>%
+  select(-full_text) %>%
+  filter(!(grepl(c(intro1,intro2), character_words)),
+         character != "Scene Description") %>%
+  unnest_tokens(word, character_words) %>%
+  anti_join(stop_words, by = "word") %>%
+  filter(!(word %in% blacklist))
+
+script_words %>%
+  count(character, word)
+```
 
 Pivot the dataframe wider, so each character gets a column whose values are the number of words they had in the episode.
 
