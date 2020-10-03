@@ -183,7 +183,7 @@ character_words <- avatar %>%
 ```
 
 ```{r word count distribution, message=FALSE, warning=FALSE}
-main_characters <- c("Aang", "Azula", "Iroh", "Katara", "Ozai", "Sokka", "Toph", "Zuko")
+main_characters <- c("Aang", "Azula", "Iroh", "Katara", "Sokka", "Toph", "Zuko")
 
 #font_import(pattern = "herculanum.ttf", paths = "C:\\Windows\\Fonts\\", prompt = F)
 #font_import(prompt = F)
@@ -218,7 +218,7 @@ blacklist <- c("hey", "yeah", "guys", "gonna")
 
 script_words <- avatar %>%
   add_count(character) %>%
-  filter(n >= 10) %>%
+  filter(n >= 50) %>%
   select(-full_text) %>%
   filter(!(grepl(c(intro1,intro2), character_words)),
          character != "Scene Description") %>%
@@ -226,9 +226,48 @@ script_words <- avatar %>%
   anti_join(stop_words, by = "word") %>%
   filter(!(word %in% blacklist))
 
-script_words %>%
-  count(character, word)
+character_tf_idf <- script_words %>%
+  add_count(word) %>%
+  filter(n >= 5) %>%
+  count(word, character) %>%
+  bind_tf_idf(word, character, n) %>%
+  arrange(desc(tf_idf))
 ```
+
+```{r tf_idf by main character, fig.height=8, fig.width=10, message=FALSE, warning=FALSE}
+character_tf_idf %>%
+  filter(character %in% main_characters) %>%
+  mutate(nation = case_when(
+    character %in% c("Aang") ~ "Air Nomads",
+    character %in% c("Azula", "Iroh", "Zuko") ~ "Fire Nation",
+    character %in% c("Toph") ~ "Earth Kingdom",
+    character %in% c("Katara", "Sokka") ~ "Water Tribe"
+  )) %>%
+  group_by(character) %>%
+  top_n(10, tf_idf) %>%
+  ungroup() %>%
+  mutate(word = reorder_within(word, tf_idf, character)) %>%
+  ggplot(aes(word, tf_idf)) + 
+  geom_bar(aes(fill = nation), stat = "identity") + 
+  scale_fill_manual(values = c(
+    "Earth Kingdom" = "tan4",
+    "Fire Nation" = "firebrick",
+    "Water Tribe" = "royalblue2",
+    "Air Nomads" = "gold2"
+  )) +
+  coord_flip() + 
+  scale_x_reordered() +
+  facet_wrap(~ character, scales = "free_y", ncol = 4) + 
+  labs(
+    title = "TF-IDF Character Analysis",
+    subtitle = "Which words are most specific to each character?",
+    x = "",
+    y = "TF-IDF of character-word pairs"
+  ) + 
+  theme_avatar(title.font = "Herculanum",
+               text.font = "Herculanum")
+```
+
 
 Pivot the dataframe wider, so each character gets a column whose values are the number of words they had in the episode.
 
