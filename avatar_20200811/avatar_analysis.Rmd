@@ -228,13 +228,17 @@ character_words %>%
 
 ### TF-IDF Analysis
 
-TF-IDF (term frequency-inverse document frequency) is one of the most popular term-weighing schemes used in text mining today. Briefly, it is a statistical measure of how import a term is in a document (i.e. the lines of a character in a TV show) relatve to the entire corpus (i.e. the entire script of that TV show) the document resides in. The 'inverse document frequency' aspect of the measure helps to devalue words which appear commonly in general throughout the entire corpus and are not specific to any one document. For example, all characters in ATLA are likely to use the word "bending" (the magic system in the ATLA universe), so that word would be unlikely to have a high TF-IDF score for any given characer. In general, the top terms as ranked by TF-IDF value can be considered "signature" phrases for that character.
+[TF-IDF](https://en.wikipedia.org/wiki/Tf%E2%80%93idf) (term frequency-inverse document frequency) is one of the most popular term-weighing schemes used in text mining today. Briefly, it is a statistical measure of how import a term is in a document (i.e. the lines of a character in a TV show) relatve to the entire corpus (i.e. the entire script of that TV show) the document resides in. The 'inverse document frequency' aspect of the measure helps to devalue words which appear commonly in general throughout the entire corpus and are not specific to any one document. For example, all characters in ATLA are likely to use the word "bending" (the magic system in the ATLA universe), so that word would be unlikely to have a high TF-IDF score for any given characer. In general, the top terms as ranked by TF-IDF value can be considered "signature" phrases for that character.
 
 ```{r message=FALSE, warning=FALSE}
 #additional words to add to the list of stop_words
 blacklist <- c("hey", "yeah", "guys", "gonna")
 
 #reshape the dataframe for TF-IDF analysis
+## tokens
+token_blacklist <- c("yip", "gran", "dai", "li", "ty", "lee", "kai", "agni",
+                     "father", "raiders", "twinkle", "toes")
+
 script_words <- avatar %>%
   add_count(character) %>% #add a column adding all lines per character
   filter(n >= 50) %>% #filter out any characters who have too few lines
@@ -243,15 +247,33 @@ script_words <- avatar %>%
          character != "Scene Description") %>% #filter misleading lines
   unnest_tokens(word, character_words) %>% #separate each line into individual tokens (words)
   anti_join(stop_words, by = "word") %>% #remove stopwords
-  filter(!(word %in% blacklist)) #remove extra stopwords
+  filter(!(word %in% blacklist),
+         !(word %in% token_blacklist)) #remove extra stopwords
+
+##bigrams
+bigram_blacklist <- c("the dai", "aang i", "uncle i")
+
+script_bigrams <- avatar %>%
+  add_count(character) %>% #add a column adding all lines per character
+  filter(n >= 50) %>% #filter out any characters who have too few lines
+  select(-full_text) %>% #trim duplicate less-tidy column for script
+  filter(!(grepl(c(intro1,intro2), character_words)),
+         character != "Scene Description") %>% #filter misleading lines
+  unnest_tokens(word, character_words, token = "ngrams", n = 2) %>% #separate each line into BIGRAMS
+  anti_join(stop_words, by = "word") %>% #remove stopwords
+  filter(!(word %in% blacklist),
+         !(word %in% bigram_blacklist)) #remove extra stopwords
 
 character_tf_idf <- script_words %>%
+  rbind(script_bigrams) %>%
   add_count(word) %>% #add count for how often each word appears
   filter(n >= 5) %>% #filter out words that occur infrequently
   count(word, character) %>% #create a column counting each token by character
   bind_tf_idf(word, character, n) %>% #create TF-IDF scores
   arrange(desc(tf_idf)) #rearrange rows
 ```
+
+The following graph displays the top 10 terms for each of the main characters of ATLA, where the color of the bars is used to denote the characters nationality. As with most TF-IDF analysis for a TV show, a lot of each characters top terms are simply the name of another character. There are some interesting terms which fall into this category, which at first glance would not appear to. For example, Azula's top term is "Zuzu", which is actually a childhood pet name for her brother Zuko, which she frequently uses throughout the show in a condescending way. Similarly, two of Toph's top terms are "Twinkle" and "Toes", both of which seem like very odd terms in a vacuum. This is where allowing for bigrams would have come in handy, as the two terms are nearly always used in tandem as a personal nickname for Aang. Here the terms have noticeably different TF-IDF scores (0.023 vs 0.017) likely because other characters in the show use the term "toes". Another interesting anomaly which would have been solved by allowing for bigrams is that many of the words that made the Top 10 cut are either part of a two 
 
 ```{r tf_idf by main character, fig.height=8, fig.width=10, message=FALSE, warning=FALSE}
 character_tf_idf %>%
@@ -280,14 +302,13 @@ character_tf_idf %>%
   facet_wrap(~ character, scales = "free_y", ncol = 4) + 
   labs(
     title = "Avatar: the Last Airbender - TF-IDF Character Analysis",
-    subtitle = "What are the signature words for each character?",
+    subtitle = "What are the signature terms for each character?",
     x = "",
     y = "TF-IDF of character-word pairs"
   ) + 
   theme_avatar(title.font = "Herculanum",
                text.font = "Herculanum") + 
   theme(
-    #axis.text.x = element_text(angle = 45, hjust = 1),
     panel.grid = element_blank(),
     axis.text.x = element_blank()
   )

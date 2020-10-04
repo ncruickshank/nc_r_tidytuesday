@@ -268,9 +268,10 @@ character_words %>%
 
 ### TF-IDF Analysis
 
-TF-IDF (term frequency-inverse document frequency) is one of the most
-popular term-weighing schemes used in text mining today. Briefly, it is
-a statistical measure of how import a term is in a document (i.e. the
+[TF-IDF](https://en.wikipedia.org/wiki/Tf%E2%80%93idf) (term
+frequency-inverse document frequency) is one of the most popular
+term-weighing schemes used in text mining today. Briefly, it is a
+statistical measure of how import a term is in a document (i.e. the
 lines of a character in a TV show) relatve to the entire corpus
 (i.e. the entire script of that TV show) the document resides in. The
 ‘inverse document frequency’ aspect of the measure helps to devalue
@@ -286,6 +287,10 @@ value can be considered “signature” phrases for that character.
 blacklist <- c("hey", "yeah", "guys", "gonna")
 
 #reshape the dataframe for TF-IDF analysis
+## tokens
+token_blacklist <- c("yip", "gran", "dai", "li", "ty", "lee", "kai", "agni",
+                     "father", "raiders", "twinkle", "toes")
+
 script_words <- avatar %>%
   add_count(character) %>% #add a column adding all lines per character
   filter(n >= 50) %>% #filter out any characters who have too few lines
@@ -294,15 +299,49 @@ script_words <- avatar %>%
          character != "Scene Description") %>% #filter misleading lines
   unnest_tokens(word, character_words) %>% #separate each line into individual tokens (words)
   anti_join(stop_words, by = "word") %>% #remove stopwords
-  filter(!(word %in% blacklist)) #remove extra stopwords
+  filter(!(word %in% blacklist),
+         !(word %in% token_blacklist)) #remove extra stopwords
+
+##bigrams
+bigram_blacklist <- c("the dai", "aang i", "uncle i")
+
+script_bigrams <- avatar %>%
+  add_count(character) %>% #add a column adding all lines per character
+  filter(n >= 50) %>% #filter out any characters who have too few lines
+  select(-full_text) %>% #trim duplicate less-tidy column for script
+  filter(!(grepl(c(intro1,intro2), character_words)),
+         character != "Scene Description") %>% #filter misleading lines
+  unnest_tokens(word, character_words, token = "ngrams", n = 2) %>% #separate each line into BIGRAMS
+  anti_join(stop_words, by = "word") %>% #remove stopwords
+  filter(!(word %in% blacklist),
+         !(word %in% bigram_blacklist)) #remove extra stopwords
 
 character_tf_idf <- script_words %>%
+  rbind(script_bigrams) %>%
   add_count(word) %>% #add count for how often each word appears
   filter(n >= 5) %>% #filter out words that occur infrequently
   count(word, character) %>% #create a column counting each token by character
   bind_tf_idf(word, character, n) %>% #create TF-IDF scores
   arrange(desc(tf_idf)) #rearrange rows
 ```
+
+The following graph displays the top 10 terms for each of the main
+characters of ATLA, where the color of the bars is used to denote the
+characters nationality. As with most TF-IDF analysis for a TV show, a
+lot of each characters top terms are simply the name of another
+character. There are some interesting terms which fall into this
+category, which at first glance would not appear to. For example,
+Azula’s top term is “Zuzu”, which is actually a childhood pet name for
+her brother Zuko, which she frequently uses throughout the show in a
+condescending way. Similarly, two of Toph’s top terms are “Twinkle” and
+“Toes”, both of which seem like very odd terms in a vacuum. This is
+where allowing for bigrams would have come in handy, as the two terms
+are nearly always used in tandem as a personal nickname for Aang. Here
+the terms have noticeably different TF-IDF scores (0.023 vs 0.017)
+likely because other characters in the show use the term “toes”. Another
+interesting anomaly which would have been solved by allowing for bigrams
+is that many of the words that made the Top 10 cut are either part of a
+two
 
 ``` r
 character_tf_idf %>%
@@ -331,14 +370,13 @@ character_tf_idf %>%
   facet_wrap(~ character, scales = "free_y", ncol = 4) + 
   labs(
     title = "Avatar: the Last Airbender - TF-IDF Character Analysis",
-    subtitle = "What are the signature words for each character?",
+    subtitle = "What are the signature terms for each character?",
     x = "",
     y = "TF-IDF of character-word pairs"
   ) + 
   theme_avatar(title.font = "Herculanum",
                text.font = "Herculanum") + 
   theme(
-    #axis.text.x = element_text(angle = 45, hjust = 1),
     panel.grid = element_blank(),
     axis.text.x = element_blank()
   )
@@ -570,20 +608,20 @@ lasso_fit %>%
   tidy()
 ```
 
-    ## # A tibble: 2,546 x 5
+    ## # A tibble: 1,733 x 5
     ##    term         step estimate lambda dev.ratio
     ##    <chr>       <dbl>    <dbl>  <dbl>     <dbl>
-    ##  1 (Intercept)     1   8.75    0.280    0     
-    ##  2 (Intercept)     2   8.75    0.256    0.0472
-    ##  3 katara          2  -0.0252  0.256    0.0472
-    ##  4 (Intercept)     3   8.75    0.233    0.0863
-    ##  5 katara          3  -0.0481  0.233    0.0863
-    ##  6 (Intercept)     4   8.75    0.212    0.119 
-    ##  7 katara          4  -0.0690  0.212    0.119 
-    ##  8 (Intercept)     5   8.75    0.193    0.146 
-    ##  9 katara          5  -0.0880  0.193    0.146 
-    ## 10 (Intercept)     6   8.75    0.176    0.184 
-    ## # ... with 2,536 more rows
+    ##  1 (Intercept)     1  8.72     0.283    0     
+    ##  2 (Intercept)     2  8.72     0.258    0.0392
+    ##  3 katara          2 -0.0254   0.258    0.0392
+    ##  4 (Intercept)     3  8.72     0.235    0.0717
+    ##  5 katara          3 -0.0485   0.235    0.0717
+    ##  6 (Intercept)     4  8.72     0.214    0.0987
+    ##  7 katara          4 -0.0696   0.214    0.0987
+    ##  8 (Intercept)     5  8.72     0.195    0.123 
+    ##  9 katara          5 -0.0888   0.195    0.123 
+    ## 10 yue             5  0.00214  0.195    0.123 
+    ## # ... with 1,723 more rows
 
 tune the lasso model
 
@@ -624,18 +662,18 @@ lasso_grid %>%
 ```
 
     ## # A tibble: 100 x 6
-    ##     penalty .metric .estimator   mean     n std_err
-    ##       <dbl> <chr>   <chr>       <dbl> <int>   <dbl>
-    ##  1 1.00e-10 rmse    standard   3.82      25  1.41  
-    ##  2 1.00e-10 rsq     standard   0.0893    25  0.0177
-    ##  3 1.60e-10 rmse    standard   3.82      25  1.41  
-    ##  4 1.60e-10 rsq     standard   0.0893    25  0.0177
-    ##  5 2.56e-10 rmse    standard   3.82      25  1.41  
-    ##  6 2.56e-10 rsq     standard   0.0893    25  0.0177
-    ##  7 4.09e-10 rmse    standard   3.82      25  1.41  
-    ##  8 4.09e-10 rsq     standard   0.0893    25  0.0177
-    ##  9 6.55e-10 rmse    standard   3.82      25  1.41  
-    ## 10 6.55e-10 rsq     standard   0.0893    25  0.0177
+    ##     penalty .metric .estimator    mean     n std_err
+    ##       <dbl> <chr>   <chr>        <dbl> <int>   <dbl>
+    ##  1 1.00e-10 rmse    standard   10.6       25  7.19  
+    ##  2 1.00e-10 rsq     standard    0.0916    25  0.0203
+    ##  3 1.60e-10 rmse    standard   10.6       25  7.19  
+    ##  4 1.60e-10 rsq     standard    0.0916    25  0.0203
+    ##  5 2.56e-10 rmse    standard   10.6       25  7.19  
+    ##  6 2.56e-10 rsq     standard    0.0916    25  0.0203
+    ##  7 4.09e-10 rmse    standard   10.6       25  7.19  
+    ##  8 4.09e-10 rsq     standard    0.0916    25  0.0203
+    ##  9 6.55e-10 rmse    standard   10.6       25  7.19  
+    ## 10 6.55e-10 rsq     standard    0.0916    25  0.0203
     ## # ... with 90 more rows
 
 Visualize the results
@@ -657,7 +695,7 @@ lasso_grid %>%
   theme(legend.position = "none")
 ```
 
-    ## Warning: Removed 3 rows containing missing values (geom_errorbar).
+    ## Warning: Removed 2 rows containing missing values (geom_errorbar).
 
     ## Warning: Removed 2 rows containing missing values (geom_path).
 
@@ -722,5 +760,5 @@ last_fit(
     ## # A tibble: 2 x 3
     ##   .metric .estimator .estimate
     ##   <chr>   <chr>          <dbl>
-    ## 1 rmse    standard       0.619
-    ## 2 rsq     standard       0.631
+    ## 1 rmse    standard       0.458
+    ## 2 rsq     standard       0.571
