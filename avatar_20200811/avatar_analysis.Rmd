@@ -10,7 +10,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ![](images/astral_avatar.jpg)
 
-The following analysis was performed on the Avatar: the Last Airbender script, as compiled by the r4ds tidytuesday community. The core dataset (`avatar.csv`), consists of the following variables:
+The following analysis was performed on the Avatar: the Last Airbender (ATLA) script, as compiled by the r4ds tidytuesday community. The core dataset (`avatar.csv`), consists of the following variables:
 
 variable        | class     | description
 ----------------|-----------|-----------------
@@ -88,6 +88,9 @@ as_tibble(avatar) %>% head(5)
 #### IMDb Rating Distribution
 
 ```{r}
+# font used in Avatar: the Last Airbender
+##font_import(pattern = "herculanum.ttf")
+
 # values to be expressed in the following plot
 # worst episode
 worst_ep <- eps %>%
@@ -135,17 +138,7 @@ eps %>%
   )
 ```
 
-### Director and Writer Analysis
-
-Which directors or writers were associated with the most succesful episodes of Avatar?
-
-### "Cabbages" Trending
-
-Track the running joke for the "MY CABBAGES" joke.
-
-### Zuko Transformation Analysis
-
-### IMDb Ratings Over Time
+#### IMDb Ratings Over Time
 
 ```{r ratings over time, fig.height=6, fig.width=10, message=FALSE, warning=FALSE}
 eps %>%
@@ -160,14 +153,14 @@ eps %>%
   )) +
   ggrepel::geom_label_repel(
     data = filter(eps, imdb_rating >= 9.4),
-    aes(label = chapter),
+    aes(label = paste0(book_num, sep = ".", chapter_num, sep = ": ", chapter)),
     size = 3,
     alpha = 0.5,
     color = "forestgreen"
   ) +
   ggrepel::geom_label_repel(
     data = filter(eps, imdb_rating <= 7.8),
-    aes(label = chapter),
+    aes(label = paste0(book_num, sep = ".", chapter_num, sep = ": ", chapter)),
     size = 3,
     alpha = 0.5,
     color = "firebrick"
@@ -187,18 +180,9 @@ eps %>%
   )
 ```
 
-
-
-
-## Which characters had the most lines?
-
-For each line of each episode, create a column which counts the number of words (excluding stop words?) that line contains.
+### Which characters had the most lines?
 
 ```{r create df for word count by character, message=FALSE, warning=FALSE}
-# define strings to trim from dataset.
-intro1 <- "Water. Earth. Fire. Air. My grandmother used to tell me"
-intro2 <- "Long ago, the four nations lived together in harmony."
-
 character_words <- avatar %>%
   filter(!(grepl(c(intro1,intro2), character_words)),
          character != "Scene Description") %>%
@@ -206,14 +190,12 @@ character_words <- avatar %>%
   dplyr::summarise(
     words = wordcount(character_words)
   )
-  #mutate(words = wordcount(character_words)) #doesn't work right, appears to work within a summarise
 ```
 
-```{r word count distribution, message=FALSE, warning=FALSE}
-main_characters <- c("Aang", "Azula", "Iroh", "Katara", "Sokka", "Toph", "Zuko")
+Given that Aang, Katara, and Sokka are the main characters throughout the entire series, it is no surprise that they have the most overall words spoken throughout the show. Zuko fetured much more prominently in Book 3 because (SPOILER) he joined "Team Avatar" and became a good guy. Conversely Iroh was featured _less_ prominently in Book 3 due in part to the direction the story took and in part to the fact that the original voice actor [died](https://en.wikipedia.org/wiki/Mako_(actor)) and was replaced with Greg Baldwin for Book 3. 
 
-#font_import(pattern = "herculanum.ttf", paths = "C:\\Windows\\Fonts\\", prompt = F)
-#font_import(prompt = F)
+```{r word count distribution, fig.height=5, fig.width=10, message=FALSE, warning=FALSE}
+main_characters <- c("Aang", "Azula", "Iroh", "Katara", "Sokka", "Toph", "Zuko")
 
 character_words %>%
   filter(character %in% main_characters) %>%
@@ -234,31 +216,41 @@ character_words %>%
     y = "Total Words"
   ) +
   theme_avatar(title.font = "Herculanum",
-               text.font = "Herculanum")
+               text.font = "Herculanum") + 
+  theme(
+    panel.grid = element_blank()
+  )
 ```
 
+### TF-IDF Analysis
 
-### Transcripts
+TF-IDF (term frequency-inverse document frequency) is one of the most popular term-weighing schemes used in text mining today. Briefly, it is a statistical measure of how import a term is in a document (i.e. the lines of a character in a TV show) relatve to the entire corpus (i.e. the entire script of that TV show) the document resides in. The 'inverse document frequency' aspect of the measure helps to devalue words which appear commonly in general throughout the entire corpus and are not specific to any one document. For example, all characters in ATLA are likely to use the word "bending" (the magic system in the ATLA universe), so that word would be unlikely to have a high TF-IDF score for any given characer. In general, the top terms as ranked by TF-IDF value can be considered "signature" phrases for that character.
 
 ```{r message=FALSE, warning=FALSE}
+#additional words to add to the list of stop_words
 blacklist <- c("hey", "yeah", "guys", "gonna")
 
+# define strings to trim from dataset.
+intro1 <- "Water. Earth. Fire. Air. My grandmother used to tell me"
+intro2 <- "Long ago, the four nations lived together in harmony."
+
+#reshape the dataframe for TF-IDF analysis
 script_words <- avatar %>%
-  add_count(character) %>%
-  filter(n >= 50) %>%
-  select(-full_text) %>%
+  add_count(character) %>% #add a column adding all lines per character
+  filter(n >= 50) %>% #filter out any characters who have too few lines
+  select(-full_text) %>% #trim duplicate less-tidy column for script
   filter(!(grepl(c(intro1,intro2), character_words)),
-         character != "Scene Description") %>%
-  unnest_tokens(word, character_words) %>%
-  anti_join(stop_words, by = "word") %>%
-  filter(!(word %in% blacklist))
+         character != "Scene Description") %>% #filter misleading lines
+  unnest_tokens(word, character_words) %>% #separate each line into individual tokens (words)
+  anti_join(stop_words, by = "word") %>% #remove stopwords
+  filter(!(word %in% blacklist)) #remove extra stopwords
 
 character_tf_idf <- script_words %>%
-  add_count(word) %>%
-  filter(n >= 5) %>%
-  count(word, character) %>%
-  bind_tf_idf(word, character, n) %>%
-  arrange(desc(tf_idf))
+  add_count(word) %>% #add count for how often each word appears
+  filter(n >= 5) %>% #filter out words that occur infrequently
+  count(word, character) %>% #create a column counting each token by character
+  bind_tf_idf(word, character, n) %>% #create TF-IDF scores
+  arrange(desc(tf_idf)) #rearrange rows
 ```
 
 ```{r tf_idf by main character, fig.height=8, fig.width=10, message=FALSE, warning=FALSE}
@@ -282,44 +274,24 @@ character_tf_idf %>%
     "Water Tribe" = "royalblue2",
     "Air Nomads" = "gold2"
   )) +
+  geom_text(aes(label = round(tf_idf, 3)), size = 2.5, hjust = 1) +
   coord_flip() + 
   scale_x_reordered() +
   facet_wrap(~ character, scales = "free_y", ncol = 4) + 
   labs(
-    title = "TF-IDF Character Analysis",
-    subtitle = "Which words are most specific to each character?",
+    title = "Avatar: the Last Airbender - TF-IDF Character Analysis",
+    subtitle = "What are the signature words for each character?",
     x = "",
     y = "TF-IDF of character-word pairs"
   ) + 
   theme_avatar(title.font = "Herculanum",
                text.font = "Herculanum") + 
   theme(
-    axis.text.x = element_text(angle = 45, hjust = 1)
+    #axis.text.x = element_text(angle = 45, hjust = 1),
+    panel.grid = element_blank(),
+    axis.text.x = element_blank()
   )
 ```
-
-### Machine learning model
-
-What affects popularity of an episode:
- - Season/time
- - Director
- - Writer
- - Lines per character
- 
-```{r}
-avatar %>%
-  count(chapter, character) 
-```
-
-
-
-Pivot the dataframe wider, so each character gets a column whose values are the number of words they had in the episode.
-
-Apply the same logic for each writer and director, but instead the column is boolean (i.e. If writer one is in s1e1, than the column value is 1 for that episode, else 0).
-
-Train-test split the resulting dataframe, with IMDb rating as the y-value.
-
-Assess numerous different models for accuracy.
 
 ## Machine Learning
 
