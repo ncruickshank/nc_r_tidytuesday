@@ -183,6 +183,10 @@ eps %>%
 ### Which characters had the most lines?
 
 ```{r create df for word count by character, message=FALSE, warning=FALSE}
+# define strings to trim from dataset.
+intro1 <- "Water. Earth. Fire. Air. My grandmother used to tell me"
+intro2 <- "Long ago, the four nations lived together in harmony."
+
 character_words <- avatar %>%
   filter(!(grepl(c(intro1,intro2), character_words)),
          character != "Scene Description") %>%
@@ -229,10 +233,6 @@ TF-IDF (term frequency-inverse document frequency) is one of the most popular te
 ```{r message=FALSE, warning=FALSE}
 #additional words to add to the list of stop_words
 blacklist <- c("hey", "yeah", "guys", "gonna")
-
-# define strings to trim from dataset.
-intro1 <- "Water. Earth. Fire. Air. My grandmother used to tell me"
-intro2 <- "Long ago, the four nations lived together in harmony."
 
 #reshape the dataframe for TF-IDF analysis
 script_words <- avatar %>%

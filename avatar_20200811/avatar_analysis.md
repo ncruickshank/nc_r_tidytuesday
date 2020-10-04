@@ -5,8 +5,8 @@ Nick Cruickshank
 ![](images/astral_avatar.jpg)
 
 The following analysis was performed on the Avatar: the Last Airbender
-script, as compiled by the r4ds tidytuesday community. The core dataset
-(`avatar.csv`), consists of the following variables:
+(ATLA) script, as compiled by the r4ds tidytuesday community. The core
+dataset (`avatar.csv`), consists of the following variables:
 
 | variable         | class     | description                                   |
 | ---------------- | --------- | --------------------------------------------- |
@@ -115,6 +115,9 @@ as_tibble(avatar) %>% head(5)
 #### IMDb Rating Distribution
 
 ``` r
+# font used in Avatar: the Last Airbender
+##font_import(pattern = "herculanum.ttf")
+
 # values to be expressed in the following plot
 # worst episode
 worst_ep <- eps %>%
@@ -164,18 +167,7 @@ eps %>%
 
 ![](avatar_analysis_files/figure-gfm/episode%20breakdown-1.png)<!-- -->
 
-### Director and Writer Analysis
-
-Which directors or writers were associated with the most succesful
-episodes of Avatar?
-
-### “Cabbages” Trending
-
-Track the running joke for the “MY CABBAGES” joke.
-
-### Zuko Transformation Analysis
-
-### IMDb Ratings Over Time
+#### IMDb Ratings Over Time
 
 ``` r
 eps %>%
@@ -190,14 +182,14 @@ eps %>%
   )) +
   ggrepel::geom_label_repel(
     data = filter(eps, imdb_rating >= 9.4),
-    aes(label = chapter),
+    aes(label = paste0(book_num, sep = ".", chapter_num, sep = ": ", chapter)),
     size = 3,
     alpha = 0.5,
     color = "forestgreen"
   ) +
   ggrepel::geom_label_repel(
     data = filter(eps, imdb_rating <= 7.8),
-    aes(label = chapter),
+    aes(label = paste0(book_num, sep = ".", chapter_num, sep = ": ", chapter)),
     size = 3,
     alpha = 0.5,
     color = "firebrick"
@@ -219,10 +211,7 @@ eps %>%
 
 ![](avatar_analysis_files/figure-gfm/ratings%20over%20time-1.png)<!-- -->
 
-## Which characters had the most lines?
-
-For each line of each episode, create a column which counts the number
-of words (excluding stop words?) that line contains.
+### Which characters had the most lines?
 
 ``` r
 # define strings to trim from dataset.
@@ -236,14 +225,19 @@ character_words <- avatar %>%
   dplyr::summarise(
     words = wordcount(character_words)
   )
-  #mutate(words = wordcount(character_words)) #doesn't work right, appears to work within a summarise
 ```
+
+Given that Aang, Katara, and Sokka are the main characters throughout
+the entire series, it is no surprise that they have the most overall
+words spoken throughout the show. Zuko fetured much more prominently in
+Book 3 because (SPOILER) he joined “Team Avatar” and became a good guy.
+Conversely Iroh was featured *less* prominently in Book 3 due in part to
+the direction the story took and in part to the fact that the original
+voice actor [died](https://en.wikipedia.org/wiki/Mako_\(actor\)) and was
+replaced with Greg Baldwin for Book 3.
 
 ``` r
 main_characters <- c("Aang", "Azula", "Iroh", "Katara", "Sokka", "Toph", "Zuko")
-
-#font_import(pattern = "herculanum.ttf", paths = "C:\\Windows\\Fonts\\", prompt = F)
-#font_import(prompt = F)
 
 character_words %>%
   filter(character %in% main_characters) %>%
@@ -264,32 +258,50 @@ character_words %>%
     y = "Total Words"
   ) +
   theme_avatar(title.font = "Herculanum",
-               text.font = "Herculanum")
+               text.font = "Herculanum") + 
+  theme(
+    panel.grid = element_blank()
+  )
 ```
 
 ![](avatar_analysis_files/figure-gfm/word%20count%20distribution-1.png)<!-- -->
 
-### Transcripts
+### TF-IDF Analysis
+
+TF-IDF (term frequency-inverse document frequency) is one of the most
+popular term-weighing schemes used in text mining today. Briefly, it is
+a statistical measure of how import a term is in a document (i.e. the
+lines of a character in a TV show) relatve to the entire corpus
+(i.e. the entire script of that TV show) the document resides in. The
+‘inverse document frequency’ aspect of the measure helps to devalue
+words which appear commonly in general throughout the entire corpus and
+are not specific to any one document. For example, all characters in
+ATLA are likely to use the word “bending” (the magic system in the ATLA
+universe), so that word would be unlikely to have a high TF-IDF score
+for any given characer. In general, the top terms as ranked by TF-IDF
+value can be considered “signature” phrases for that character.
 
 ``` r
+#additional words to add to the list of stop_words
 blacklist <- c("hey", "yeah", "guys", "gonna")
 
+#reshape the dataframe for TF-IDF analysis
 script_words <- avatar %>%
-  add_count(character) %>%
-  filter(n >= 50) %>%
-  select(-full_text) %>%
+  add_count(character) %>% #add a column adding all lines per character
+  filter(n >= 50) %>% #filter out any characters who have too few lines
+  select(-full_text) %>% #trim duplicate less-tidy column for script
   filter(!(grepl(c(intro1,intro2), character_words)),
-         character != "Scene Description") %>%
-  unnest_tokens(word, character_words) %>%
-  anti_join(stop_words, by = "word") %>%
-  filter(!(word %in% blacklist))
+         character != "Scene Description") %>% #filter misleading lines
+  unnest_tokens(word, character_words) %>% #separate each line into individual tokens (words)
+  anti_join(stop_words, by = "word") %>% #remove stopwords
+  filter(!(word %in% blacklist)) #remove extra stopwords
 
 character_tf_idf <- script_words %>%
-  add_count(word) %>%
-  filter(n >= 5) %>%
-  count(word, character) %>%
-  bind_tf_idf(word, character, n) %>%
-  arrange(desc(tf_idf))
+  add_count(word) %>% #add count for how often each word appears
+  filter(n >= 5) %>% #filter out words that occur infrequently
+  count(word, character) %>% #create a column counting each token by character
+  bind_tf_idf(word, character, n) %>% #create TF-IDF scores
+  arrange(desc(tf_idf)) #rearrange rows
 ```
 
 ``` r
@@ -313,60 +325,26 @@ character_tf_idf %>%
     "Water Tribe" = "royalblue2",
     "Air Nomads" = "gold2"
   )) +
+  geom_text(aes(label = round(tf_idf, 3)), size = 2.5, hjust = 1) +
   coord_flip() + 
   scale_x_reordered() +
   facet_wrap(~ character, scales = "free_y", ncol = 4) + 
   labs(
-    title = "TF-IDF Character Analysis",
-    subtitle = "Which words are most specific to each character?",
+    title = "Avatar: the Last Airbender - TF-IDF Character Analysis",
+    subtitle = "What are the signature words for each character?",
     x = "",
     y = "TF-IDF of character-word pairs"
   ) + 
   theme_avatar(title.font = "Herculanum",
                text.font = "Herculanum") + 
   theme(
-    axis.text.x = element_text(angle = 45, hjust = 1)
+    #axis.text.x = element_text(angle = 45, hjust = 1),
+    panel.grid = element_blank(),
+    axis.text.x = element_blank()
   )
 ```
 
 ![](avatar_analysis_files/figure-gfm/tf_idf%20by%20main%20character-1.png)<!-- -->
-
-### Machine learning model
-
-What affects popularity of an episode: - Season/time - Director - Writer
-- Lines per character
-
-``` r
-avatar %>%
-  count(chapter, character) 
-```
-
-    ## # A tibble: 964 x 3
-    ##    chapter          character             n
-    ##    <chr>            <chr>             <int>
-    ##  1 Appa's Lost Days Aang                  4
-    ##  2 Appa's Lost Days Azula                 5
-    ##  3 Appa's Lost Days Farmer                1
-    ##  4 Appa's Lost Days Fire Nation man       3
-    ##  5 Appa's Lost Days Ghashiun              6
-    ##  6 Appa's Lost Days Iio                   1
-    ##  7 Appa's Lost Days Iroh                  1
-    ##  8 Appa's Lost Days Kyoshi Warrior #1     2
-    ##  9 Appa's Lost Days Kyoshi Warrior #2     1
-    ## 10 Appa's Lost Days Mai                   2
-    ## # ... with 954 more rows
-
-Pivot the dataframe wider, so each character gets a column whose values
-are the number of words they had in the episode.
-
-Apply the same logic for each writer and director, but instead the
-column is boolean (i.e. If writer one is in s1e1, than the column value
-is 1 for that episode, else 0).
-
-Train-test split the resulting dataframe, with IMDb rating as the
-y-value.
-
-Assess numerous different models for accuracy.
 
 ## Machine Learning
 
@@ -539,7 +517,7 @@ df %>%
                text.font = "Herculanum")
 ```
 
-![](avatar_analysis_files/figure-gfm/unnamed-chunk-10-1.png)<!-- -->
+![](avatar_analysis_files/figure-gfm/unnamed-chunk-9-1.png)<!-- -->
 
 ## Training the model
 
@@ -592,20 +570,20 @@ lasso_fit %>%
   tidy()
 ```
 
-    ## # A tibble: 2,042 x 5
+    ## # A tibble: 2,546 x 5
     ##    term         step estimate lambda dev.ratio
     ##    <chr>       <dbl>    <dbl>  <dbl>     <dbl>
-    ##  1 (Intercept)     1   8.69    0.359    0     
-    ##  2 (Intercept)     2   8.69    0.327    0.0590
-    ##  3 katara          2  -0.0322  0.327    0.0590
-    ##  4 (Intercept)     3   8.69    0.298    0.108 
-    ##  5 katara          3  -0.0616  0.298    0.108 
-    ##  6 (Intercept)     4   8.69    0.272    0.149 
-    ##  7 katara          4  -0.0883  0.272    0.149 
-    ##  8 (Intercept)     5   8.69    0.247    0.183 
-    ##  9 katara          5  -0.113   0.247    0.183 
-    ## 10 (Intercept)     6   8.69    0.225    0.211 
-    ## # ... with 2,032 more rows
+    ##  1 (Intercept)     1   8.75    0.280    0     
+    ##  2 (Intercept)     2   8.75    0.256    0.0472
+    ##  3 katara          2  -0.0252  0.256    0.0472
+    ##  4 (Intercept)     3   8.75    0.233    0.0863
+    ##  5 katara          3  -0.0481  0.233    0.0863
+    ##  6 (Intercept)     4   8.75    0.212    0.119 
+    ##  7 katara          4  -0.0690  0.212    0.119 
+    ##  8 (Intercept)     5   8.75    0.193    0.146 
+    ##  9 katara          5  -0.0880  0.193    0.146 
+    ## 10 (Intercept)     6   8.75    0.176    0.184 
+    ## # ... with 2,536 more rows
 
 tune the lasso model
 
@@ -646,18 +624,18 @@ lasso_grid %>%
 ```
 
     ## # A tibble: 100 x 6
-    ##     penalty .metric .estimator  mean     n std_err
-    ##       <dbl> <chr>   <chr>      <dbl> <int>   <dbl>
-    ##  1 1.00e-10 rmse    standard   3.35     25  0.696 
-    ##  2 1.00e-10 rsq     standard   0.135    25  0.0274
-    ##  3 1.60e-10 rmse    standard   3.35     25  0.696 
-    ##  4 1.60e-10 rsq     standard   0.135    25  0.0274
-    ##  5 2.56e-10 rmse    standard   3.35     25  0.696 
-    ##  6 2.56e-10 rsq     standard   0.135    25  0.0274
-    ##  7 4.09e-10 rmse    standard   3.35     25  0.696 
-    ##  8 4.09e-10 rsq     standard   0.135    25  0.0274
-    ##  9 6.55e-10 rmse    standard   3.35     25  0.696 
-    ## 10 6.55e-10 rsq     standard   0.135    25  0.0274
+    ##     penalty .metric .estimator   mean     n std_err
+    ##       <dbl> <chr>   <chr>       <dbl> <int>   <dbl>
+    ##  1 1.00e-10 rmse    standard   3.82      25  1.41  
+    ##  2 1.00e-10 rsq     standard   0.0893    25  0.0177
+    ##  3 1.60e-10 rmse    standard   3.82      25  1.41  
+    ##  4 1.60e-10 rsq     standard   0.0893    25  0.0177
+    ##  5 2.56e-10 rmse    standard   3.82      25  1.41  
+    ##  6 2.56e-10 rsq     standard   0.0893    25  0.0177
+    ##  7 4.09e-10 rmse    standard   3.82      25  1.41  
+    ##  8 4.09e-10 rsq     standard   0.0893    25  0.0177
+    ##  9 6.55e-10 rmse    standard   3.82      25  1.41  
+    ## 10 6.55e-10 rsq     standard   0.0893    25  0.0177
     ## # ... with 90 more rows
 
 Visualize the results
@@ -679,11 +657,11 @@ lasso_grid %>%
   theme(legend.position = "none")
 ```
 
-    ## Warning: Removed 2 rows containing missing values (geom_errorbar).
+    ## Warning: Removed 3 rows containing missing values (geom_errorbar).
 
     ## Warning: Removed 2 rows containing missing values (geom_path).
 
-![](avatar_analysis_files/figure-gfm/unnamed-chunk-18-1.png)<!-- -->
+![](avatar_analysis_files/figure-gfm/unnamed-chunk-17-1.png)<!-- -->
 
 select best penalty value
 
@@ -744,5 +722,5 @@ last_fit(
     ## # A tibble: 2 x 3
     ##   .metric .estimator .estimate
     ##   <chr>   <chr>          <dbl>
-    ## 1 rmse    standard       0.438
-    ## 2 rsq     standard       0.231
+    ## 1 rmse    standard       0.619
+    ## 2 rsq     standard       0.631
