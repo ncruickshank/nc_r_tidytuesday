@@ -1,7 +1,34 @@
 Avatar: The Last Airbender Analysis
 ================
 Nick Cruickshank
-9/24/2020
+
+![](images/astral_avatar.jpg)
+
+The following analysis was performed on the Avatar: the Last Airbender
+script, as compiled by the r4ds tidytuesday community. The core dataset
+(`avatar.csv`), consists of the following variables:
+
+| variable         | class     | description                                   |
+| ---------------- | --------- | --------------------------------------------- |
+| id               | integer   | Unique Row identifier                         |
+| book             | character | Book name                                     |
+| book\_num        | integer   | Book number                                   |
+| chapter          | character | Chapter name                                  |
+| chapter\_num     | integer   | Chapter number                                |
+| character        | character | Character speaking                            |
+| full\_text       | character | Full text (scene description, character text) |
+| character\_words | character | Text coming from characters                   |
+| writer           | character | Writer of book                                |
+| director         | character | Director of episode                           |
+| imdb\_rating     | double    | IMDB rating for episode                       |
+
+For those who are unfamiliar with the well-loved Nickelodeon TV show,
+[Wikipedia](https://en.wikipedia.org/wiki/Avatar:_The_Last_Airbender)
+has provided a good summary:
+
+    Avatar: The Last Airbender (Avatar: The Legend of Aang in some regions) is an American animated television series created by Michael Dante DiMartino and Bryan Konietzko, with Aaron Ehasz as head writer. The series is also referred to as Avatar or ATLA by fans. It aired on Nickelodeon for three seasons, from February 2005 to July 2008.[2] Avatar is set in an Asiatic-like world in which some people can manipulate one of the four elements—water, earth, fire, or air—with telekinetic variants of the Chinese martial arts known as "bending". The only individual who can bend all four elements, the "Avatar", is responsible for maintaining harmony between the world's four nations, and serves as the bridge between the spirit world and the physical world. The show is presented in a style that combines anime with American cartoons, and relies on the imagery of mainly East Asian culture, with some South Asian, New World, and Inuit and Sireniki influences.
+    
+    The series is centered around the journey of 12-year-old Aang, the current Avatar and last survivor of his nation, the Air Nomads, along with his friends Sokka, Katara, and later Toph, as they strive to end the Fire Nation's war against the other nations of the world. It also follows the story of Zuko—the exiled prince of the Fire Nation, seeking to restore his lost honor by capturing Aang, accompanied by his wise uncle Iroh—and later, that of his ambitious sister Azula.
 
 ## Load Information
 
@@ -9,6 +36,7 @@ Nick Cruickshank
 # load libraries
 library(extrafont)
 library(forcats)
+library(ggrepel)
 library(glmnet)
 library(glue)
 library(janitor)
@@ -17,6 +45,7 @@ library(readr)
 library(shadowtext)
 library(tidyverse)
 library(tidymodels)
+library(tidytext)
 library(tvthemes)
 library(vip)
 loadfonts(device = "win")
@@ -38,6 +67,8 @@ eps <- avatar %>%
            sep = ", ")
 # for each character, create a column with percent of spoke lines
 
+eps$imdb_rating[is.na(eps$imdb_rating)] <- 9.4
+
 books <- unique(avatar$book)
 ```
 
@@ -51,7 +82,7 @@ knitr::kable(avatar %>% head(1))
 | -: | :---- | --------: | :--------------------- | -----------: | :-------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :-------------------------------------------------------------------------------------- | :---------- | -----------: |
 |  1 | Water |         1 | The Boy in the Iceberg |            1 | Katara    | Water. Earth. Fire. Air. My grandmother used to tell me stories about the old days: a time of peace when the Avatar kept balance between the Water Tribes, Earth Kingdom, Fire Nation and Air Nomads. But that all changed when the Fire Nation attacked. Only the Avatar mastered all four elements; only he could stop the ruthless firebenders. But when the world needed him most, he vanished. A hundred years have passed, and the Fire Nation is nearing victory in the war. Two years ago, my father and the men of my tribe journeyed to the Earth Kingdom to help fight against the Fire Nation, leaving me and my brother to look after our tribe. Some people believe that the Avatar was never reborn into the Air Nomads and that the cycle is broken, but I haven’t lost hope. I still believe that, somehow, the Avatar will return to save the world. | Water. Earth. Fire. Air. My grandmother used to tell me stories about the old days: a time of peace when the Avatar kept balance between the Water Tribes, Earth Kingdom, Fire Nation and Air Nomads. But that all changed when the Fire Nation attacked. Only the Avatar mastered all four elements; only he could stop the ruthless firebenders. But when the world needed him most, he vanished. A hundred years have passed, and the Fire Nation is nearing victory in the war. Two years ago, my father and the men of my tribe journeyed to the Earth Kingdom to help fight against the Fire Nation, leaving me and my brother to look after our tribe. Some people believe that the Avatar was never reborn into the Air Nomads and that the cycle is broken, but I haven’t lost hope. I still believe that, somehow, the Avatar will return to save the world. | ‎Michael Dante DiMartino, Bryan Konietzko, Aaron Ehasz, Peter Goldfinger, Josh Stolberg | Dave Filoni |          8.1 |
 
-## Exploratory Analysis
+## Exploratory Data Analysis
 
 ### Episode Breakdown by IMDB Rating
 
@@ -113,6 +144,50 @@ Track the running joke for the “MY CABBAGES” joke.
 
 ### Zuko Transformation Analysis
 
+### IMDb Ratings Over Time
+
+``` r
+eps %>%
+  mutate(chapter = fct_inorder(chapter)) %>%
+  ggplot(aes(chapter, imdb_rating)) + 
+  geom_line(group = 1) + 
+  geom_point(aes(color = factor(book)), size = 2) +
+  scale_color_manual(values = c(
+    "Earth" = "tan2",
+    "Fire" = "firebrick",
+    "Water" = "royalblue2"
+  )) +
+  ggrepel::geom_label_repel(
+    data = filter(eps, imdb_rating >= 9.4),
+    aes(label = chapter),
+    size = 3,
+    alpha = 0.5,
+    color = "forestgreen"
+  ) +
+  ggrepel::geom_label_repel(
+    data = filter(eps, imdb_rating <= 7.8),
+    aes(label = chapter),
+    size = 3,
+    alpha = 0.5,
+    color = "firebrick"
+  ) +
+  labs(
+    title = "Avatar the Last Airbender: IMDb Ratings by Epsiode",
+    x = "Chapter",
+    y = "IMDb Rating"
+  ) + 
+  theme_avatar(title.font = "Herculanum",
+               text.font = "Herculanum") +
+  theme(
+    #axis.text.x = element_text(angle = 90, hjust = 1),
+    axis.text.x = element_blank(),
+    panel.grid.major.x = element_blank(),
+    legend.position = "none"
+  )
+```
+
+![](avatar_analysis_files/figure-gfm/ratings%20over%20time-1.png)<!-- -->
+
 ## Which characters had the most lines?
 
 For each line of each episode, create a column which counts the number
@@ -134,7 +209,7 @@ character_words <- avatar %>%
 ```
 
 ``` r
-main_characters <- c("Aang", "Azula", "Iroh", "Katara", "Ozai", "Sokka", "Toph", "Zuko")
+main_characters <- c("Aang", "Azula", "Iroh", "Katara", "Sokka", "Toph", "Zuko")
 
 #font_import(pattern = "herculanum.ttf", paths = "C:\\Windows\\Fonts\\", prompt = F)
 #font_import(prompt = F)
@@ -162,6 +237,93 @@ character_words %>%
 ```
 
 ![](avatar_analysis_files/figure-gfm/word%20count%20distribution-1.png)<!-- -->
+
+### Transcripts
+
+``` r
+blacklist <- c("hey", "yeah", "guys", "gonna")
+
+script_words <- avatar %>%
+  add_count(character) %>%
+  filter(n >= 50) %>%
+  select(-full_text) %>%
+  filter(!(grepl(c(intro1,intro2), character_words)),
+         character != "Scene Description") %>%
+  unnest_tokens(word, character_words) %>%
+  anti_join(stop_words, by = "word") %>%
+  filter(!(word %in% blacklist))
+
+character_tf_idf <- script_words %>%
+  add_count(word) %>%
+  filter(n >= 5) %>%
+  count(word, character) %>%
+  bind_tf_idf(word, character, n) %>%
+  arrange(desc(tf_idf))
+```
+
+``` r
+character_tf_idf %>%
+  filter(character %in% main_characters) %>%
+  mutate(nation = case_when(
+    character %in% c("Aang") ~ "Air Nomads",
+    character %in% c("Azula", "Iroh", "Zuko") ~ "Fire Nation",
+    character %in% c("Toph") ~ "Earth Kingdom",
+    character %in% c("Katara", "Sokka") ~ "Water Tribe"
+  )) %>%
+  group_by(character) %>%
+  top_n(10, tf_idf) %>%
+  ungroup() %>%
+  mutate(word = reorder_within(word, tf_idf, character)) %>%
+  ggplot(aes(word, tf_idf)) + 
+  geom_bar(aes(fill = nation), stat = "identity") + 
+  scale_fill_manual(values = c(
+    "Earth Kingdom" = "tan4",
+    "Fire Nation" = "firebrick",
+    "Water Tribe" = "royalblue2",
+    "Air Nomads" = "gold2"
+  )) +
+  coord_flip() + 
+  scale_x_reordered() +
+  facet_wrap(~ character, scales = "free_y", ncol = 4) + 
+  labs(
+    title = "TF-IDF Character Analysis",
+    subtitle = "Which words are most specific to each character?",
+    x = "",
+    y = "TF-IDF of character-word pairs"
+  ) + 
+  theme_avatar(title.font = "Herculanum",
+               text.font = "Herculanum") + 
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+```
+
+![](avatar_analysis_files/figure-gfm/tf_idf%20by%20main%20character-1.png)<!-- -->
+
+### Machine learning model
+
+What affects popularity of an episode: - Season/time - Director - Writer
+- Lines per character
+
+``` r
+avatar %>%
+  count(chapter, character) 
+```
+
+    ## # A tibble: 964 x 3
+    ##    chapter          character             n
+    ##    <chr>            <chr>             <int>
+    ##  1 Appa's Lost Days Aang                  4
+    ##  2 Appa's Lost Days Azula                 5
+    ##  3 Appa's Lost Days Farmer                1
+    ##  4 Appa's Lost Days Fire Nation man       3
+    ##  5 Appa's Lost Days Ghashiun              6
+    ##  6 Appa's Lost Days Iio                   1
+    ##  7 Appa's Lost Days Iroh                  1
+    ##  8 Appa's Lost Days Kyoshi Warrior #1     2
+    ##  9 Appa's Lost Days Kyoshi Warrior #2     1
+    ## 10 Appa's Lost Days Mai                   2
+    ## # ... with 954 more rows
 
 Pivot the dataframe wider, so each character gets a column whose values
 are the number of words they had in the episode.
@@ -346,7 +508,7 @@ df %>%
                text.font = "Herculanum")
 ```
 
-![](avatar_analysis_files/figure-gfm/unnamed-chunk-8-1.png)<!-- -->
+![](avatar_analysis_files/figure-gfm/unnamed-chunk-10-1.png)<!-- -->
 
 ## Training the model
 
@@ -399,20 +561,20 @@ lasso_fit %>%
   tidy()
 ```
 
-    ## # A tibble: 1,867 x 5
-    ##    term         step estimate lambda dev.ratio
-    ##    <chr>       <dbl>    <dbl>  <dbl>     <dbl>
-    ##  1 (Intercept)     1   8.69    0.309    0     
-    ##  2 (Intercept)     2   8.69    0.282    0.0453
-    ##  3 katara          2  -0.0278  0.282    0.0453
-    ##  4 (Intercept)     3   8.69    0.257    0.0828
-    ##  5 katara          3  -0.0530  0.257    0.0828
-    ##  6 (Intercept)     4   8.69    0.234    0.114 
-    ##  7 katara          4  -0.0761  0.234    0.114 
-    ##  8 (Intercept)     5   8.69    0.213    0.154 
-    ##  9 katara          5  -0.0966  0.213    0.154 
-    ## 10 aaron_ehasz     5   0.0120  0.213    0.154 
-    ## # ... with 1,857 more rows
+    ## # A tibble: 2,259 x 5
+    ##    term         step  estimate lambda dev.ratio
+    ##    <chr>       <dbl>     <dbl>  <dbl>     <dbl>
+    ##  1 (Intercept)     1  8.68      0.322    0     
+    ##  2 (Intercept)     2  8.68      0.294    0.0468
+    ##  3 katara          2 -0.0289    0.294    0.0468
+    ##  4 (Intercept)     3  8.68      0.268    0.0857
+    ##  5 katara          3 -0.0553    0.268    0.0857
+    ##  6 (Intercept)     4  8.68      0.244    0.118 
+    ##  7 katara          4 -0.0793    0.244    0.118 
+    ##  8 (Intercept)     5  8.68      0.222    0.145 
+    ##  9 aang            5 -0.000152  0.222    0.145 
+    ## 10 katara          5 -0.101     0.222    0.145 
+    ## # ... with 2,249 more rows
 
 tune the lasso model
 
@@ -453,18 +615,18 @@ lasso_grid %>%
 ```
 
     ## # A tibble: 100 x 6
-    ##     penalty .metric .estimator   mean     n std_err
-    ##       <dbl> <chr>   <chr>       <dbl> <int>   <dbl>
-    ##  1 1.00e-10 rmse    standard   3.28      25  0.732 
-    ##  2 1.00e-10 rsq     standard   0.0940    25  0.0213
-    ##  3 1.60e-10 rmse    standard   3.28      25  0.732 
-    ##  4 1.60e-10 rsq     standard   0.0940    25  0.0213
-    ##  5 2.56e-10 rmse    standard   3.28      25  0.732 
-    ##  6 2.56e-10 rsq     standard   0.0940    25  0.0213
-    ##  7 4.09e-10 rmse    standard   3.28      25  0.732 
-    ##  8 4.09e-10 rsq     standard   0.0940    25  0.0213
-    ##  9 6.55e-10 rmse    standard   3.28      25  0.732 
-    ## 10 6.55e-10 rsq     standard   0.0940    25  0.0213
+    ##     penalty .metric .estimator  mean     n std_err
+    ##       <dbl> <chr>   <chr>      <dbl> <int>   <dbl>
+    ##  1 1.00e-10 rmse    standard   2.70     25  0.420 
+    ##  2 1.00e-10 rsq     standard   0.155    25  0.0252
+    ##  3 1.60e-10 rmse    standard   2.70     25  0.420 
+    ##  4 1.60e-10 rsq     standard   0.155    25  0.0252
+    ##  5 2.56e-10 rmse    standard   2.70     25  0.420 
+    ##  6 2.56e-10 rsq     standard   0.155    25  0.0252
+    ##  7 4.09e-10 rmse    standard   2.70     25  0.420 
+    ##  8 4.09e-10 rsq     standard   0.155    25  0.0252
+    ##  9 6.55e-10 rmse    standard   2.70     25  0.420 
+    ## 10 6.55e-10 rsq     standard   0.155    25  0.0252
     ## # ... with 90 more rows
 
 Visualize the results
@@ -490,7 +652,7 @@ lasso_grid %>%
 
     ## Warning: Removed 2 rows containing missing values (geom_path).
 
-![](avatar_analysis_files/figure-gfm/unnamed-chunk-16-1.png)<!-- -->
+![](avatar_analysis_files/figure-gfm/unnamed-chunk-18-1.png)<!-- -->
 
 select best penalty value
 
@@ -551,5 +713,5 @@ last_fit(
     ## # A tibble: 2 x 3
     ##   .metric .estimator .estimate
     ##   <chr>   <chr>          <dbl>
-    ## 1 rmse    standard       0.436
-    ## 2 rsq     standard       0.448
+    ## 1 rmse    standard       0.439
+    ## 2 rsq     standard       0.216

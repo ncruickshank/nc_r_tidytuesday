@@ -1,13 +1,36 @@
 ---
 title: 'Avatar: The Last Airbender Analysis'
 author: "Nick Cruickshank"
-date: "9/24/2020"
 output: github_document
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
+
+![](images/astral_avatar.jpg)
+
+The following analysis was performed on the Avatar: the Last Airbender script, as compiled by the r4ds tidytuesday community. The core dataset (`avatar.csv`), consists of the following variables:
+
+variable        | class     | description
+----------------|-----------|-----------------
+id              | integer   | Unique Row identifier
+book            | character | Book name
+book_num        | integer   | Book number
+chapter         | character | Chapter name
+chapter_num     | integer   | Chapter number
+character       | character | Character speaking
+full_text       | character | Full text (scene description, character text)
+character_words | character | Text coming from characters
+writer          | character | Writer of book
+director        | character | Director of episode
+imdb_rating     | double    | IMDB rating for episode
+
+For those who are unfamiliar with the well-loved Nickelodeon TV show, [Wikipedia](https://en.wikipedia.org/wiki/Avatar:_The_Last_Airbender) has provided a good summary:
+
+> Avatar: The Last Airbender (Avatar: The Legend of Aang in some regions) is an American animated television series created by Michael Dante DiMartino and Bryan Konietzko, with Aaron Ehasz as head writer. The series is also referred to as Avatar or ATLA by fans. It aired on Nickelodeon for three seasons, from February 2005 to July 2008.[2] Avatar is set in an Asiatic-like world in which some people can manipulate one of the four elements—water, earth, fire, or air—with telekinetic variants of the Chinese martial arts known as "bending". The only individual who can bend all four elements, the "Avatar", is responsible for maintaining harmony between the world's four nations, and serves as the bridge between the spirit world and the physical world. The show is presented in a style that combines anime with American cartoons, and relies on the imagery of mainly East Asian culture, with some South Asian, New World, and Inuit and Sireniki influences.
+
+> The series is centered around the journey of 12-year-old Aang, the current Avatar and last survivor of his nation, the Air Nomads, along with his friends Sokka, Katara, and later Toph, as they strive to end the Fire Nation's war against the other nations of the world. It also follows the story of Zuko—the exiled prince of the Fire Nation, seeking to restore his lost honor by capturing Aang, accompanied by his wise uncle Iroh—and later, that of his ambitious sister Azula.
 
 ## Load Information
 
@@ -55,14 +78,17 @@ books <- unique(avatar$book)
 ## Describe DF
 
 ```{r}
-knitr::kable(avatar %>% head(1))
+as_tibble(avatar) %>% head(5)
 ```
 
 ## Exploratory Data Analysis
 
 ### Episode Breakdown by IMDB Rating
 
+#### IMDb Rating Distribution
+
 ```{r}
+# values to be expressed in the following plot
 # worst episode
 worst_ep <- eps %>%
   arrange(imdb_rating) %>%
@@ -82,29 +108,30 @@ best_chap <- best_ep$chapter
 best_chap_rating <- best_ep$imdb_rating
 ```
 
-
-```{r episode breakdown, fig.height=8, fig.width=7, message=FALSE, warning=FALSE}
+```{r episode breakdown, fig.height=8, fig.width=10, message=FALSE, warning=FALSE}
 # create a graph visualizing the episodes by imbd_rating
 eps %>%
-  ggplot(aes(book_num, chapter_num)) + 
+  ggplot(aes(fct_reorder(as.factor(book), book_num), chapter_num)) + 
   geom_tile(aes(fill = imdb_rating), color = "black") + 
-  scale_fill_viridis_c(option = "plasma") + 
-  geom_shadowtext(aes(label = chapter), size = 2.5) + 
+  scale_fill_viridis_c(option = "magma") + 
+  geom_shadowtext(
+    aes(label = paste0(book_num, sep = ".", chapter_num, sep = ": ", chapter)), size = 3) + 
   labs(
     title = "Avatar Episode IMDb Ratings",
-    subtitle = glue("Best episode was '{best_chap}' with a rating of {best_chap_rating}\n
-                    Worst episode was '{worst_chap}' with a rating of {worst_chap_rating}"),
+    subtitle = glue("Best episode: '{best_chap}' (IMDb Rating - {best_chap_rating})\n
+                    Worst episode: '{worst_chap}' (IMDb Rating {worst_chap_rating})"),
     x = "Book",
-    y = "Chapter",
+    y = "",
     fill = "IMBd Rating"
   ) +
   theme_avatar(title.font = "Herculanum",
                text.font = "Herculanum") + 
   theme(
-    legend.position = c(0.2,0.96),
+    legend.position = c(0.85,1.05),
     legend.direction = "horizontal",
     legend.box.background = element_rect(),
-    panel.grid = element_blank()
+    panel.grid = element_blank(),
+    axis.text.y = element_blank()
   )
 ```
 
@@ -265,8 +292,25 @@ character_tf_idf %>%
     y = "TF-IDF of character-word pairs"
   ) + 
   theme_avatar(title.font = "Herculanum",
-               text.font = "Herculanum")
+               text.font = "Herculanum") + 
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
 ```
+
+### Machine learning model
+
+What affects popularity of an episode:
+ - Season/time
+ - Director
+ - Writer
+ - Lines per character
+ 
+```{r}
+avatar %>%
+  count(chapter, character) 
+```
+
 
 
 Pivot the dataframe wider, so each character gets a column whose values are the number of words they had in the episode.
