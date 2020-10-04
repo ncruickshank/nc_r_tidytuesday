@@ -26,9 +26,29 @@ For those who are unfamiliar with the well-loved Nickelodeon TV show,
 [Wikipedia](https://en.wikipedia.org/wiki/Avatar:_The_Last_Airbender)
 has provided a good summary:
 
-    Avatar: The Last Airbender (Avatar: The Legend of Aang in some regions) is an American animated television series created by Michael Dante DiMartino and Bryan Konietzko, with Aaron Ehasz as head writer. The series is also referred to as Avatar or ATLA by fans. It aired on Nickelodeon for three seasons, from February 2005 to July 2008.[2] Avatar is set in an Asiatic-like world in which some people can manipulate one of the four elements—water, earth, fire, or air—with telekinetic variants of the Chinese martial arts known as "bending". The only individual who can bend all four elements, the "Avatar", is responsible for maintaining harmony between the world's four nations, and serves as the bridge between the spirit world and the physical world. The show is presented in a style that combines anime with American cartoons, and relies on the imagery of mainly East Asian culture, with some South Asian, New World, and Inuit and Sireniki influences.
-    
-    The series is centered around the journey of 12-year-old Aang, the current Avatar and last survivor of his nation, the Air Nomads, along with his friends Sokka, Katara, and later Toph, as they strive to end the Fire Nation's war against the other nations of the world. It also follows the story of Zuko—the exiled prince of the Fire Nation, seeking to restore his lost honor by capturing Aang, accompanied by his wise uncle Iroh—and later, that of his ambitious sister Azula.
+> Avatar: The Last Airbender (Avatar: The Legend of Aang in some
+> regions) is an American animated television series created by Michael
+> Dante DiMartino and Bryan Konietzko, with Aaron Ehasz as head writer.
+> The series is also referred to as Avatar or ATLA by fans. It aired on
+> Nickelodeon for three seasons, from February 2005 to July 2008.\[2\]
+> Avatar is set in an Asiatic-like world in which some people can
+> manipulate one of the four elements—water, earth, fire, or air—with
+> telekinetic variants of the Chinese martial arts known as “bending”.
+> The only individual who can bend all four elements, the “Avatar”, is
+> responsible for maintaining harmony between the world’s four nations,
+> and serves as the bridge between the spirit world and the physical
+> world. The show is presented in a style that combines anime with
+> American cartoons, and relies on the imagery of mainly East Asian
+> culture, with some South Asian, New World, and Inuit and Sireniki
+> influences.
+
+> The series is centered around the journey of 12-year-old Aang, the
+> current Avatar and last survivor of his nation, the Air Nomads, along
+> with his friends Sokka, Katara, and later Toph, as they strive to end
+> the Fire Nation’s war against the other nations of the world. It also
+> follows the story of Zuko—the exiled prince of the Fire Nation,
+> seeking to restore his lost honor by capturing Aang, accompanied by
+> his wise uncle Iroh—and later, that of his ambitious sister Azula.
 
 ## Load Information
 
@@ -75,18 +95,27 @@ books <- unique(avatar$book)
 ## Describe DF
 
 ``` r
-knitr::kable(avatar %>% head(1))
+as_tibble(avatar) %>% head(5)
 ```
 
-| id | book  | book\_num | chapter                | chapter\_num | character | full\_text                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | character\_words                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | writer                                                                                  | director    | imdb\_rating |
-| -: | :---- | --------: | :--------------------- | -----------: | :-------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :-------------------------------------------------------------------------------------- | :---------- | -----------: |
-|  1 | Water |         1 | The Boy in the Iceberg |            1 | Katara    | Water. Earth. Fire. Air. My grandmother used to tell me stories about the old days: a time of peace when the Avatar kept balance between the Water Tribes, Earth Kingdom, Fire Nation and Air Nomads. But that all changed when the Fire Nation attacked. Only the Avatar mastered all four elements; only he could stop the ruthless firebenders. But when the world needed him most, he vanished. A hundred years have passed, and the Fire Nation is nearing victory in the war. Two years ago, my father and the men of my tribe journeyed to the Earth Kingdom to help fight against the Fire Nation, leaving me and my brother to look after our tribe. Some people believe that the Avatar was never reborn into the Air Nomads and that the cycle is broken, but I haven’t lost hope. I still believe that, somehow, the Avatar will return to save the world. | Water. Earth. Fire. Air. My grandmother used to tell me stories about the old days: a time of peace when the Avatar kept balance between the Water Tribes, Earth Kingdom, Fire Nation and Air Nomads. But that all changed when the Fire Nation attacked. Only the Avatar mastered all four elements; only he could stop the ruthless firebenders. But when the world needed him most, he vanished. A hundred years have passed, and the Fire Nation is nearing victory in the war. Two years ago, my father and the men of my tribe journeyed to the Earth Kingdom to help fight against the Fire Nation, leaving me and my brother to look after our tribe. Some people believe that the Avatar was never reborn into the Air Nomads and that the cycle is broken, but I haven’t lost hope. I still believe that, somehow, the Avatar will return to save the world. | ‎Michael Dante DiMartino, Bryan Konietzko, Aaron Ehasz, Peter Goldfinger, Josh Stolberg | Dave Filoni |          8.1 |
+    ## # A tibble: 5 x 11
+    ##      id book  book_num chapter chapter_num character full_text character_words
+    ##   <dbl> <chr>    <dbl> <chr>         <dbl> <chr>     <chr>     <chr>          
+    ## 1     1 Water        1 The Bo~           1 Katara    "Water. ~ Water. Earth. ~
+    ## 2     2 Water        1 The Bo~           1 Scene De~ "As the ~ <NA>           
+    ## 3     3 Water        1 The Bo~           1 Sokka     "It's no~ It's not getti~
+    ## 4     4 Water        1 The Bo~           1 Scene De~ "The sho~ <NA>           
+    ## 5     5 Water        1 The Bo~           1 Katara    "[Happil~ Sokka, look!   
+    ## # ... with 3 more variables: writer <chr>, director <chr>, imdb_rating <dbl>
 
 ## Exploratory Data Analysis
 
 ### Episode Breakdown by IMDB Rating
 
+#### IMDb Rating Distribution
+
 ``` r
+# values to be expressed in the following plot
 # worst episode
 worst_ep <- eps %>%
   arrange(imdb_rating) %>%
@@ -109,25 +138,27 @@ best_chap_rating <- best_ep$imdb_rating
 ``` r
 # create a graph visualizing the episodes by imbd_rating
 eps %>%
-  ggplot(aes(book_num, chapter_num)) + 
+  ggplot(aes(fct_reorder(as.factor(book), book_num), chapter_num)) + 
   geom_tile(aes(fill = imdb_rating), color = "black") + 
-  scale_fill_viridis_c(option = "plasma") + 
-  geom_shadowtext(aes(label = chapter), size = 2.5) + 
+  scale_fill_viridis_c(option = "magma") + 
+  geom_shadowtext(
+    aes(label = paste0(book_num, sep = ".", chapter_num, sep = ": ", chapter)), size = 3) + 
   labs(
     title = "Avatar Episode IMDb Ratings",
-    subtitle = glue("Best episode was '{best_chap}' with a rating of {best_chap_rating}\n
-                    Worst episode was '{worst_chap}' with a rating of {worst_chap_rating}"),
+    subtitle = glue("Best episode: '{best_chap}' (IMDb Rating - {best_chap_rating})\n
+                    Worst episode: '{worst_chap}' (IMDb Rating {worst_chap_rating})"),
     x = "Book",
-    y = "Chapter",
+    y = "",
     fill = "IMBd Rating"
   ) +
   theme_avatar(title.font = "Herculanum",
                text.font = "Herculanum") + 
   theme(
-    legend.position = c(0.2,0.96),
+    legend.position = c(0.85,1.05),
     legend.direction = "horizontal",
     legend.box.background = element_rect(),
-    panel.grid = element_blank()
+    panel.grid = element_blank(),
+    axis.text.y = element_blank()
   )
 ```
 
@@ -561,20 +592,20 @@ lasso_fit %>%
   tidy()
 ```
 
-    ## # A tibble: 2,259 x 5
-    ##    term         step  estimate lambda dev.ratio
-    ##    <chr>       <dbl>     <dbl>  <dbl>     <dbl>
-    ##  1 (Intercept)     1  8.68      0.322    0     
-    ##  2 (Intercept)     2  8.68      0.294    0.0468
-    ##  3 katara          2 -0.0289    0.294    0.0468
-    ##  4 (Intercept)     3  8.68      0.268    0.0857
-    ##  5 katara          3 -0.0553    0.268    0.0857
-    ##  6 (Intercept)     4  8.68      0.244    0.118 
-    ##  7 katara          4 -0.0793    0.244    0.118 
-    ##  8 (Intercept)     5  8.68      0.222    0.145 
-    ##  9 aang            5 -0.000152  0.222    0.145 
-    ## 10 katara          5 -0.101     0.222    0.145 
-    ## # ... with 2,249 more rows
+    ## # A tibble: 2,042 x 5
+    ##    term         step estimate lambda dev.ratio
+    ##    <chr>       <dbl>    <dbl>  <dbl>     <dbl>
+    ##  1 (Intercept)     1   8.69    0.359    0     
+    ##  2 (Intercept)     2   8.69    0.327    0.0590
+    ##  3 katara          2  -0.0322  0.327    0.0590
+    ##  4 (Intercept)     3   8.69    0.298    0.108 
+    ##  5 katara          3  -0.0616  0.298    0.108 
+    ##  6 (Intercept)     4   8.69    0.272    0.149 
+    ##  7 katara          4  -0.0883  0.272    0.149 
+    ##  8 (Intercept)     5   8.69    0.247    0.183 
+    ##  9 katara          5  -0.113   0.247    0.183 
+    ## 10 (Intercept)     6   8.69    0.225    0.211 
+    ## # ... with 2,032 more rows
 
 tune the lasso model
 
@@ -617,16 +648,16 @@ lasso_grid %>%
     ## # A tibble: 100 x 6
     ##     penalty .metric .estimator  mean     n std_err
     ##       <dbl> <chr>   <chr>      <dbl> <int>   <dbl>
-    ##  1 1.00e-10 rmse    standard   2.70     25  0.420 
-    ##  2 1.00e-10 rsq     standard   0.155    25  0.0252
-    ##  3 1.60e-10 rmse    standard   2.70     25  0.420 
-    ##  4 1.60e-10 rsq     standard   0.155    25  0.0252
-    ##  5 2.56e-10 rmse    standard   2.70     25  0.420 
-    ##  6 2.56e-10 rsq     standard   0.155    25  0.0252
-    ##  7 4.09e-10 rmse    standard   2.70     25  0.420 
-    ##  8 4.09e-10 rsq     standard   0.155    25  0.0252
-    ##  9 6.55e-10 rmse    standard   2.70     25  0.420 
-    ## 10 6.55e-10 rsq     standard   0.155    25  0.0252
+    ##  1 1.00e-10 rmse    standard   3.35     25  0.696 
+    ##  2 1.00e-10 rsq     standard   0.135    25  0.0274
+    ##  3 1.60e-10 rmse    standard   3.35     25  0.696 
+    ##  4 1.60e-10 rsq     standard   0.135    25  0.0274
+    ##  5 2.56e-10 rmse    standard   3.35     25  0.696 
+    ##  6 2.56e-10 rsq     standard   0.135    25  0.0274
+    ##  7 4.09e-10 rmse    standard   3.35     25  0.696 
+    ##  8 4.09e-10 rsq     standard   0.135    25  0.0274
+    ##  9 6.55e-10 rmse    standard   3.35     25  0.696 
+    ## 10 6.55e-10 rsq     standard   0.135    25  0.0274
     ## # ... with 90 more rows
 
 Visualize the results
@@ -713,5 +744,5 @@ last_fit(
     ## # A tibble: 2 x 3
     ##   .metric .estimator .estimate
     ##   <chr>   <chr>          <dbl>
-    ## 1 rmse    standard       0.439
-    ## 2 rsq     standard       0.216
+    ## 1 rmse    standard       0.438
+    ## 2 rsq     standard       0.231
