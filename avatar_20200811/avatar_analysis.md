@@ -303,7 +303,7 @@ script_words <- avatar %>%
          !(word %in% token_blacklist)) #remove extra stopwords
 
 ##bigrams
-bigram_blacklist <- c("the dai", "aang i", "uncle i")
+bigram_blacklist <- c("the dai", "aang i", "uncle i", "zuko you")
 
 script_bigrams <- avatar %>%
   add_count(character) %>% #add a column adding all lines per character
@@ -333,15 +333,11 @@ character. There are some interesting terms which fall into this
 category, which at first glance would not appear to. For example,
 Azula’s top term is “Zuzu”, which is actually a childhood pet name for
 her brother Zuko, which she frequently uses throughout the show in a
-condescending way. Similarly, two of Toph’s top terms are “Twinkle” and
-“Toes”, both of which seem like very odd terms in a vacuum. This is
-where allowing for bigrams would have come in handy, as the two terms
-are nearly always used in tandem as a personal nickname for Aang. Here
-the terms have noticeably different TF-IDF scores (0.023 vs 0.017)
-likely because other characters in the show use the term “toes”. Another
-interesting anomaly which would have been solved by allowing for bigrams
-is that many of the words that made the Top 10 cut are either part of a
-two
+condescending way. Additionally, Toph’s top term is “Twinkle Toes”,
+which is a pet nickname for Aang. Names and nicknames aside, many of
+each characters top terms provide a good succint summary of what that
+character is about. Some of the top terms were somewhat surprising
+(Azula: Tides, Zuko: Southern Raiders).
 
 ``` r
 character_tf_idf %>%
@@ -384,9 +380,33 @@ character_tf_idf %>%
 
 ![](avatar_analysis_files/figure-gfm/tf_idf%20by%20main%20character-1.png)<!-- -->
 
-## Machine Learning
+## Machine Learning: Lasso Regression
 
-Inspired by Julia Silge: <https://juliasilge.com/blog/lasso-the-office/>
+### Introduction
+
+With some exploratory data anlysis performed, there is a possibility for
+some machine learning to be applied to the dataset provided.
+Specifically, the entire script is provided for each episode
+(predictor), alongside an IMDb rating (outcome). After reshaping the
+dataset to create columns for how prevalent each character is in each
+episode, alongside which creators (writers and directors) were involved
+or not, the implementation of lasso regression analysis should be able
+to create a model to predict the IMDb rating.
+
+Lasso (least absolute shrinkage and selection operator) regression is a
+type of linear regression which is good for simple sparse models. It is
+a type of linear regression which employs a penalty value equal to the
+absolute value of the magnitude of coefficients. This penalty score has
+the effect of setting parameter weights to zero for the least
+influential variables.
+
+### Pre-Lasso Data Manipulation
+
+The first step in the lasso regression is to tidy up the data to prepare
+it for modeling.
+
+First, the episode names need to be trimmed and tidied. Removing all
+punctuations, parts, and capitalization.
 
 ``` r
 remove_regex <- "[:punct:]|[:digit:]|parts |parts |part |the |and" # be careful defining this
@@ -399,6 +419,9 @@ avatar_info <- avatar %>%
     chap = str_trim(chap),
     imdb_rating
   )
+
+avatar_ratings <- avatar_info %>%
+  distinct(chap, imdb_rating)
 
 avatar_info
 ```
@@ -419,12 +442,12 @@ avatar_info
     ## # ... with 13,375 more rows, and 4 more variables: writer <chr>,
     ## #   director <chr>, imdb_rating <dbl>, chap <chr>
 
-``` r
-avatar_ratings <- avatar_info %>%
-  distinct(chap, imdb_rating)
-```
-
-How many times did each character speak per episode?
+Next, a count is made for each character for each they spoke per
+episode. Characters who have fewer than 50 lines throughout the entire
+show are trimmed out to make the resulting dataframe somewhat more
+meaningful. Then, dataframe is pivoted wider, where each row is an
+episode of the show and each column is a character line count for that
+episode.
 
 ``` r
 characters <- avatar_info %>%
@@ -458,7 +481,10 @@ characters
     ## # ... with 49 more rows, and 6 more variables: Hakoda <int>, Ozai <int>,
     ## #   Yue <int>, Zhao <int>, Jet <int>, Bumi <int>
 
-Which writers/directors were involved in each episode?
+A similar series of data manipulation tasks are performed for each
+creator (writers and directors). Major difference being that instead of
+how many lines per character per episode, it is a simple boolean value
+of whether the creator was involved with the episode (1) or not (0).
 
 ``` r
 creators <- avatar_info %>%
@@ -497,7 +523,8 @@ creators
     ## #   Welch Ehasz` <dbl>, `Joshua Hamilton` <dbl>, `Ethan Spaulding` <dbl>,
     ## #   `Katie Mattila` <dbl>, `Joaquim Dos Santos` <dbl>
 
-Join everything together
+Finally, the characters and creators were joined together to create the
+final dataframe to be used for the lasso regression.
 
 ``` r
 df <- avatar_info %>%
@@ -542,24 +569,13 @@ df
     ## #   ethan_spaulding <dbl>, katie_mattila <dbl>, joaquim_dos_santos <dbl>,
     ## #   imdb_rating <dbl>
 
-Some brief exploratory data analysis (EDA)
+### Training the model
 
-``` r
-df %>%
-  ggplot(aes(chapter_num, imdb_rating, fill = as.factor(chapter_num))) + 
-  geom_boxplot(show.legend = FALSE) + 
-  labs(
-    title  = "Prelim Avatar EDA"
-  ) + 
-  theme_avatar(title.font = "Herculanum",
-               text.font = "Herculanum")
-```
-
-![](avatar_analysis_files/figure-gfm/unnamed-chunk-9-1.png)<!-- -->
-
-## Training the model
-
-Perform initial split.
+Now that the avatar script has been rehaped into a format which can be
+used for lasso regression, the first step of any machine learning task
+is to perform a train-test split of the dataframe. The model is trained
+on the “Train” split, with the “Test” split withheld until the end to
+assess the the accuracy of the model.
 
 ``` r
 df_split <- initial_split(df, strata = book_num)
@@ -567,7 +583,11 @@ df_train <- training(df_split)
 df_test <- training(df_split)
 ```
 
-Preprocessing. Mainly setting index.
+Preprocessing is then performed on df\_train. Here the book and chapter
+columns are set as “ID” columns so that they are not used as predictors.
+Some other “steps” in the “recipe” included filtering out any variables
+which had zero variance (only value). The normalization step normalizes
+numeric data to have a mean of zero and a standard deviation of 1.
 
 ``` r
 df_rec <- recipe(imdb_rating ~ ., data = df_train) %>%
@@ -580,17 +600,11 @@ df_rec <- recipe(imdb_rating ~ ., data = df_train) %>%
 
 df_prep <- df_rec %>%
   prep(strings_as_factors = FALSE)
-
-#recipe(imdb_rating ~ ., data = df_train) %>%
-  #update_role(book, new_role = "ID") %>%
-  #update_role(book_num, new_role = "ID") %>%
-  #update_role(chap, new_role = "ID") %>%
-  #update_role(chapter_num, new_role = "ID") %>%
-  #step_zv(all_predictors(), -all_outcomes()) %>%
-  #step_normalize(all_predictors(), -all_outcomes())
 ```
 
-assign model (linear\_reg lasso) and fit the training data to it.
+After the “recipe” has been prepared, the lasso regression model is
+defined with an arbitray penalty value. A `workflow()` is used for
+convenience to help manage modelling pipelines.
 
 ``` r
 lasso <- linear_reg(penalty = 0.1, mixture = 1) %>%
@@ -608,24 +622,26 @@ lasso_fit %>%
   tidy()
 ```
 
-    ## # A tibble: 1,733 x 5
+    ## # A tibble: 1,624 x 5
     ##    term         step estimate lambda dev.ratio
     ##    <chr>       <dbl>    <dbl>  <dbl>     <dbl>
-    ##  1 (Intercept)     1  8.72     0.283    0     
-    ##  2 (Intercept)     2  8.72     0.258    0.0392
-    ##  3 katara          2 -0.0254   0.258    0.0392
-    ##  4 (Intercept)     3  8.72     0.235    0.0717
-    ##  5 katara          3 -0.0485   0.235    0.0717
-    ##  6 (Intercept)     4  8.72     0.214    0.0987
-    ##  7 katara          4 -0.0696   0.214    0.0987
-    ##  8 (Intercept)     5  8.72     0.195    0.123 
-    ##  9 katara          5 -0.0888   0.195    0.123 
-    ## 10 yue             5  0.00214  0.195    0.123 
-    ## # ... with 1,723 more rows
+    ##  1 (Intercept)     1   8.79    0.339    0     
+    ##  2 (Intercept)     2   8.79    0.309    0.0646
+    ##  3 katara          2  -0.0304  0.309    0.0646
+    ##  4 (Intercept)     3   8.79    0.282    0.118 
+    ##  5 katara          3  -0.0582  0.282    0.118 
+    ##  6 (Intercept)     4   8.79    0.257    0.163 
+    ##  7 katara          4  -0.0834  0.257    0.163 
+    ##  8 (Intercept)     5   8.79    0.234    0.200 
+    ##  9 katara          5  -0.106   0.234    0.200 
+    ## 10 (Intercept)     6   8.79    0.213    0.230 
+    ## # ... with 1,614 more rows
 
-tune the lasso model
+### Tuning the model
 
-define parameters to tune by
+As stated above, the penalty value which was initially chosen was done
+so in a more or less random manner. Using a bootstrap and `penalty =
+tune()`, an optimal penalty value can be arrived at for the dataframe.
 
 ``` r
 set.seed(1494)
@@ -637,7 +653,7 @@ tune_spec <- linear_reg(penalty = tune(), mixture = 1) %>%
 lambda_grid <- grid_regular(penalty(), levels = 50)
 ```
 
-tune the grid using workflow objects
+The grid of bootstraps is then tuned using the workflow object.
 
 ``` r
 doParallel::registerDoParallel()
@@ -646,7 +662,7 @@ doParallel::registerDoParallel()
 ``` r
 set.seed(1994)
 
-# is this like GridSearchCV?
+# Similar to GridSearchCV in python
 lasso_grid <- tune_grid(
   wf %>% add_model(tune_spec),
   resamples = df_boot,
@@ -654,7 +670,7 @@ lasso_grid <- tune_grid(
 )
 ```
 
-Here are the results
+The results from the tuned grid are as follows.
 
 ``` r
 lasso_grid %>%
@@ -662,21 +678,22 @@ lasso_grid %>%
 ```
 
     ## # A tibble: 100 x 6
-    ##     penalty .metric .estimator    mean     n std_err
-    ##       <dbl> <chr>   <chr>        <dbl> <int>   <dbl>
-    ##  1 1.00e-10 rmse    standard   10.6       25  7.19  
-    ##  2 1.00e-10 rsq     standard    0.0916    25  0.0203
-    ##  3 1.60e-10 rmse    standard   10.6       25  7.19  
-    ##  4 1.60e-10 rsq     standard    0.0916    25  0.0203
-    ##  5 2.56e-10 rmse    standard   10.6       25  7.19  
-    ##  6 2.56e-10 rsq     standard    0.0916    25  0.0203
-    ##  7 4.09e-10 rmse    standard   10.6       25  7.19  
-    ##  8 4.09e-10 rsq     standard    0.0916    25  0.0203
-    ##  9 6.55e-10 rmse    standard   10.6       25  7.19  
-    ## 10 6.55e-10 rsq     standard    0.0916    25  0.0203
+    ##     penalty .metric .estimator   mean     n std_err
+    ##       <dbl> <chr>   <chr>       <dbl> <int>   <dbl>
+    ##  1 1.00e-10 rmse    standard   7.35      25  4.65  
+    ##  2 1.00e-10 rsq     standard   0.0788    25  0.0185
+    ##  3 1.60e-10 rmse    standard   7.35      25  4.65  
+    ##  4 1.60e-10 rsq     standard   0.0788    25  0.0185
+    ##  5 2.56e-10 rmse    standard   7.35      25  4.65  
+    ##  6 2.56e-10 rsq     standard   0.0788    25  0.0185
+    ##  7 4.09e-10 rmse    standard   7.35      25  4.65  
+    ##  8 4.09e-10 rsq     standard   0.0788    25  0.0185
+    ##  9 6.55e-10 rmse    standard   7.35      25  4.65  
+    ## 10 6.55e-10 rsq     standard   0.0788    25  0.0185
     ## # ... with 90 more rows
 
-Visualize the results
+These tuned lasso results are then plotted to visualize where the
+optimal penalty score lies.
 
 ``` r
 lasso_grid %>%
@@ -695,13 +712,10 @@ lasso_grid %>%
   theme(legend.position = "none")
 ```
 
-    ## Warning: Removed 2 rows containing missing values (geom_errorbar).
+![](avatar_analysis_files/figure-gfm/unnamed-chunk-15-1.png)<!-- -->
 
-    ## Warning: Removed 2 rows containing missing values (geom_path).
-
-![](avatar_analysis_files/figure-gfm/unnamed-chunk-17-1.png)<!-- -->
-
-select best penalty value
+The penalty value with the lowest RMSE (root mean square error) is then
+chosen for the final model.
 
 ``` r
 lowest_rmse <- lasso_grid %>% 
@@ -713,7 +727,12 @@ final_lasso <- finalize_workflow(
 )
 ```
 
-finalize workflow and visualize training data
+The workflow is then finalized with the new penalty score chosen. The
+following graph shows the feature importance for the model learned from
+the `df_train` dataset. Higher importance scores mean that the variable
+was a better predictor for high IMDb scores. Positively scored valeus
+mean the parameter was prominently included in episodes with high IMDb
+ratings, while negative scored values indicate the opposite.
 
 ``` r
 final_lasso %>%
@@ -747,7 +766,8 @@ final_lasso %>%
 
 ![](avatar_analysis_files/figure-gfm/feature%20importance-1.png)<!-- -->
 
-fit model to test data
+Finally, the model is fit to the `df_test` to assess the accuracy of the
+model.
 
 ``` r
 last_fit(
@@ -760,5 +780,37 @@ last_fit(
     ## # A tibble: 2 x 3
     ##   .metric .estimator .estimate
     ##   <chr>   <chr>          <dbl>
-    ## 1 rmse    standard       0.458
-    ## 2 rsq     standard       0.571
+    ## 1 rmse    standard       0.627
+    ## 2 rsq     standard       0.323
+
+``` r
+last_fit(
+  final_lasso,
+  df_split
+  ) %>%
+  collect_predictions()
+```
+
+    ## # A tibble: 15 x 4
+    ##    id               .pred  .row imdb_rating
+    ##    <chr>            <dbl> <int>       <dbl>
+    ##  1 train/test split  8.76     7         8.2
+    ##  2 train/test split  8.22    10         7.8
+    ##  3 train/test split  8.68    11         7.1
+    ##  4 train/test split  8.98    13         9.1
+    ##  5 train/test split  9.02    22         9.4
+    ##  6 train/test split  8.58    24         8.2
+    ##  7 train/test split  8.88    25         8.4
+    ##  8 train/test split  8.76    26         7.7
+    ##  9 train/test split  8.76    32         8.8
+    ## 10 train/test split  9.15    38         8.8
+    ## 11 train/test split  8.67    51         7.8
+    ## 12 train/test split  9.06    57         9.2
+    ## 13 train/test split  9.06    58         8.7
+    ## 14 train/test split  8.49    60         8.9
+    ## 15 train/test split  8.81    61         8.6
+
+## Inspirations
+
+Lasso Regression Analysis of ‘The Office’ by Julia Silge:
+<https://juliasilge.com/blog/lasso-the-office/>

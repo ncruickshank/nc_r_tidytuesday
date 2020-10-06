@@ -251,7 +251,7 @@ script_words <- avatar %>%
          !(word %in% token_blacklist)) #remove extra stopwords
 
 ##bigrams
-bigram_blacklist <- c("the dai", "aang i", "uncle i")
+bigram_blacklist <- c("the dai", "aang i", "uncle i", "zuko you")
 
 script_bigrams <- avatar %>%
   add_count(character) %>% #add a column adding all lines per character
@@ -273,7 +273,7 @@ character_tf_idf <- script_words %>%
   arrange(desc(tf_idf)) #rearrange rows
 ```
 
-The following graph displays the top 10 terms for each of the main characters of ATLA, where the color of the bars is used to denote the characters nationality. As with most TF-IDF analysis for a TV show, a lot of each characters top terms are simply the name of another character. There are some interesting terms which fall into this category, which at first glance would not appear to. For example, Azula's top term is "Zuzu", which is actually a childhood pet name for her brother Zuko, which she frequently uses throughout the show in a condescending way. Similarly, two of Toph's top terms are "Twinkle" and "Toes", both of which seem like very odd terms in a vacuum. This is where allowing for bigrams would have come in handy, as the two terms are nearly always used in tandem as a personal nickname for Aang. Here the terms have noticeably different TF-IDF scores (0.023 vs 0.017) likely because other characters in the show use the term "toes". Another interesting anomaly which would have been solved by allowing for bigrams is that many of the words that made the Top 10 cut are either part of a two 
+The following graph displays the top 10 terms for each of the main characters of ATLA, where the color of the bars is used to denote the characters nationality. As with most TF-IDF analysis for a TV show, a lot of each characters top terms are simply the name of another character. There are some interesting terms which fall into this category, which at first glance would not appear to. For example, Azula's top term is "Zuzu", which is actually a childhood pet name for her brother Zuko, which she frequently uses throughout the show in a condescending way. Additionally, Toph's top term is "Twinkle Toes", which is a pet nickname for Aang. Names and nicknames aside, many of each characters top terms provide a good succint summary of what that character is about. Some of the top terms were somewhat surprising (Azula: Tides, Zuko: Southern Raiders). 
 
 ```{r tf_idf by main character, fig.height=8, fig.width=10, message=FALSE, warning=FALSE}
 character_tf_idf %>%
@@ -314,9 +314,19 @@ character_tf_idf %>%
   )
 ```
 
-## Machine Learning
+## Machine Learning: Lasso Regression
 
-Inspired by Julia Silge: https://juliasilge.com/blog/lasso-the-office/
+### Introduction
+
+With some exploratory data anlysis performed, there is a possibility for some machine learning to be applied to the dataset provided. Specifically, the entire script is provided for each episode (predictor), alongside an IMDb rating (outcome). After reshaping the dataset to create columns for how prevalent each character is in each episode, alongside which creators (writers and directors) were involved or not, the implementation of lasso regression analysis should be able to create a model to predict the IMDb rating.
+
+Lasso (least absolute shrinkage and selection operator) regression is a type of linear regression which is good for simple sparse models. It is a type of linear regression which employs a penalty value equal to the absolute value of the magnitude of coefficients. This penalty score has the effect of setting parameter weights to zero for the least influential variables.
+
+### Pre-Lasso Data Manipulation
+
+The first step in the lasso regression is to tidy up the data to prepare it for modeling.
+
+First, the episode names need to be trimmed and tidied. Removing all punctuations, parts, and capitalization.
 
 ```{r}
 remove_regex <- "[:punct:]|[:digit:]|parts |parts |part |the |and" # be careful defining this
@@ -330,16 +340,13 @@ avatar_info <- avatar %>%
     imdb_rating
   )
 
+avatar_ratings <- avatar_info %>%
+  distinct(chap, imdb_rating)
+
 avatar_info
 ```
 
-```{r}
-avatar_ratings <- avatar_info %>%
-  distinct(chap, imdb_rating)
-```
-
-
-How many times did each character speak per episode?
+Next, a count is made for each character for each they spoke per episode. Characters who have fewer than 50 lines throughout the entire show are trimmed out to make the resulting dataframe somewhat more meaningful. Then, dataframe is pivoted wider, where each row is an episode of the show and each column is a character line count for that episode.
 
 ```{r}
 characters <- avatar_info %>%
@@ -357,7 +364,7 @@ characters <- avatar_info %>%
 characters
 ```
 
-Which writers/directors were involved in each episode?
+A similar series of data manipulation tasks are performed for each creator (writers and directors). Major difference being that instead of how many lines per character per episode, it is a simple boolean value of whether the creator was involved with the episode (1) or not (0).
 
 ```{r}
 creators <- avatar_info %>%
@@ -377,7 +384,7 @@ creators <- avatar_info %>%
 creators
 ```
 
-Join everything together
+Finally, the characters and creators were joined together to create the final dataframe to be used for the lasso regression.
 
 ```{r}
 df <- avatar_info %>%
@@ -393,22 +400,9 @@ df$imdb_rating[is.na(df$imdb_rating)] <- 9.4
 df
 ```
 
-Some brief exploratory data analysis (EDA)
+### Training the model
 
-```{r message=FALSE, warning=FALSE}
-df %>%
-  ggplot(aes(chapter_num, imdb_rating, fill = as.factor(chapter_num))) + 
-  geom_boxplot(show.legend = FALSE) + 
-  labs(
-    title  = "Prelim Avatar EDA"
-  ) + 
-  theme_avatar(title.font = "Herculanum",
-               text.font = "Herculanum")
-```
-
-## Training the model
-
-Perform initial split.
+Now that the avatar script has been rehaped into a format which can be used for lasso regression, the first step of any machine learning task is to perform a train-test split of the dataframe. The model is trained on the "Train" split, with the "Test" split withheld until the end to assess the the accuracy of the model.
 
 ```{r}
 df_split <- initial_split(df, strata = book_num)
@@ -416,7 +410,7 @@ df_train <- training(df_split)
 df_test <- training(df_split)
 ```
 
-Preprocessing. Mainly setting index.
+Preprocessing is then performed on df_train. Here the book and chapter columns are set as "ID" columns so that they are not used as predictors. Some other "steps" in the "recipe" included filtering out any variables which had zero variance (only value). The normalization step normalizes numeric data to have a mean of zero and a standard deviation of 1.
 
 ```{r}
 df_rec <- recipe(imdb_rating ~ ., data = df_train) %>%
@@ -429,17 +423,9 @@ df_rec <- recipe(imdb_rating ~ ., data = df_train) %>%
 
 df_prep <- df_rec %>%
   prep(strings_as_factors = FALSE)
-
-#recipe(imdb_rating ~ ., data = df_train) %>%
-  #update_role(book, new_role = "ID") %>%
-  #update_role(book_num, new_role = "ID") %>%
-  #update_role(chap, new_role = "ID") %>%
-  #update_role(chapter_num, new_role = "ID") %>%
-  #step_zv(all_predictors(), -all_outcomes()) %>%
-  #step_normalize(all_predictors(), -all_outcomes())
 ```
 
-assign model (linear_reg lasso) and fit the training data to it.
+After the "recipe" has been prepared, the lasso regression model is defined with an arbitray penalty value. A `workflow()` is used for convenience to help manage modelling pipelines.
 
 ```{r}
 lasso <- linear_reg(penalty = 0.1, mixture = 1) %>%
@@ -457,9 +443,9 @@ lasso_fit %>%
   tidy()
 ```
 
-tune the lasso model
+### Tuning the model
 
-define parameters to tune by
+As stated above, the penalty value which was initially chosen was done so in a more or less random manner. Using a bootstrap and `penalty = tune()`, an optimal penalty value can be arrived at for the dataframe.
 
 ```{r}
 set.seed(1494)
@@ -471,7 +457,7 @@ tune_spec <- linear_reg(penalty = tune(), mixture = 1) %>%
 lambda_grid <- grid_regular(penalty(), levels = 50)
 ```
 
-tune the grid using workflow objects
+The grid of bootstraps is then tuned using the workflow object.
 
 ```{r}
 doParallel::registerDoParallel()
@@ -480,7 +466,7 @@ doParallel::registerDoParallel()
 ```{r}
 set.seed(1994)
 
-# is this like GridSearchCV?
+# Similar to GridSearchCV in python
 lasso_grid <- tune_grid(
   wf %>% add_model(tune_spec),
   resamples = df_boot,
@@ -488,16 +474,16 @@ lasso_grid <- tune_grid(
 )
 ```
 
-Here are the results
+The results from the tuned grid are as follows.
 
 ```{r}
 lasso_grid %>%
   collect_metrics()
 ```
 
-Visualize the results
+These tuned lasso results are then plotted to visualize where the optimal penalty score lies.
 
-```{r}
+```{r fig.height=4, fig.width=10, message=FALSE, warning=FALSE}
 lasso_grid %>%
   collect_metrics() %>%
   ggplot(aes(penalty, mean, color = .metric)) + 
@@ -515,7 +501,7 @@ lasso_grid %>%
 
 ```
 
-select best penalty value
+The penalty value with the lowest RMSE (root mean square error) is then chosen for the final model. 
 
 ```{r message=FALSE, warning=FALSE}
 lowest_rmse <- lasso_grid %>% 
@@ -527,7 +513,7 @@ final_lasso <- finalize_workflow(
 )
 ```
 
-finalize workflow and visualize training data
+The workflow is then finalized with the new penalty score chosen. The following graph shows the feature importance for the model learned from the `df_train` dataset. Higher importance scores mean that the variable was a better predictor for high IMDb scores. Positively scored valeus mean the parameter was prominently included in episodes with high IMDb ratings, while negative scored values indicate the opposite. 
 
 ```{r feature importance, fig.height=8, fig.width=8, message=FALSE, warning=FALSE}
 final_lasso %>%
@@ -559,7 +545,7 @@ final_lasso %>%
   )
 ```
 
-fit model to test data
+Finally, the model is fit to the `df_test` to assess the accuracy of the model.
 
 ```{r}
 last_fit(
@@ -569,3 +555,15 @@ last_fit(
   collect_metrics()
 ```
 
+```{r}
+last_fit(
+  final_lasso,
+  df_split
+  ) %>%
+  collect_predictions()
+```
+
+
+## Inspirations
+
+Lasso Regression Analysis of 'The Office' by Julia Silge: https://juliasilge.com/blog/lasso-the-office/
