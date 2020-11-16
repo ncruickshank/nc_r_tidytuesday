@@ -1,0 +1,28 @@
+---
+title: "Great American Beer Awards"
+author: "Nick Cruickshank"
+date: "11/16/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r libraries, message=FALSE, warning=FALSE}
+# libraries
+library(tidyverse)
+library(tidytuesdayR)
+```
+
+```{r data, message=FALSE, warning=FALSE}
+# data
+tuesdata <- tidytuesdayR::tt_load(2020, week = 43)
+beer_awards <- tuesdata$beer_awards
+
+# save as csv for python analysis
+#write.csv(beer_awards, "beer_awards.csv")
+```
+
+
+
