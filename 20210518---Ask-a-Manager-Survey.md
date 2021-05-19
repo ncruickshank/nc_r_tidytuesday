@@ -5,6 +5,7 @@ Nick Cruickshank
 
 ``` r
 # Load Libraries
+library(cowplot)
 library(forcats)
 library(tidytuesdayR)
 library(tidyverse)
@@ -120,16 +121,14 @@ industries <- sv %>%
 industries_list <- unique(industries$industry)
 ```
 
-### Which industries have the highest income?
-
 ``` r
-industries %>%
+income_plot <- industries %>%
   ggplot(aes(fct_reorder(industry, mean_salary), mean_salary)) + 
   geom_bar(stat = "identity", color = "darkolivegreen", fill = "darkolivegreen1") + 
   geom_text(aes(label = paste0("$", round(mean_salary/1000), "k")), hjust = 1, color = "darkolivegreen") +
   coord_flip() + 
   labs(
-    title = "Mean annual income by industry",
+    title = "Total Annual Earnings",
     x = "",
     y = ""
   ) +
@@ -139,28 +138,19 @@ industries %>%
     axis.ticks.x = element_blank(),
     panel.grid = element_blank()
   )
-```
 
-![](20210518---Ask-a-Manager-Survey_files/figure-gfm/unnamed-chunk-6-1.png)<!-- -->
-
-### Which industries have the highest proporional bonuses?
-
-The phrase “bonus” is used here as a shorthand for “other monetary
-compensation”, as there is little difference for most industries.
-However, there are some clear interesting trends here. “Sales” making
-the top of the list is no surprise as comission is built into their
-employment contracts. A similar principle stands for “retail” and
-“property or construction” (i.e. real estate).
-
-``` r
-industries %>%
+bonus_plot <- industries %>%
+  filter(
+    mean_proportional_bonus > 0.02
+  ) %>%
   ggplot(aes(fct_reorder(industry, mean_proportional_bonus), mean_proportional_bonus)) + 
-  geom_bar(stat = "identity") + 
-  geom_text(aes(label = paste0(round(100*mean_proportional_bonus, 2), "%")), hjust = -0.5) +
+  geom_bar(stat = "identity", color = "darkcyan", fill = "cyan") + 
+  geom_text(aes(label = paste0(round(100*mean_proportional_bonus, 2), "%")), hjust = 1, color = "darkcyan") +
   coord_flip() + 
   labs(
-    title = "Mean proportional bonus by industry",
-    x = ""
+    title = "Proportional Bonus",
+    x = "",
+    y = ""
   ) + 
   theme_minimal() +
   theme(
@@ -168,13 +158,99 @@ industries %>%
     axis.ticks.x = element_blank(),
     panel.grid = element_blank()
   )
+
+plot_row <- plot_grid(income_plot, bonus_plot)
+
+title <- ggdraw() + 
+  draw_label(
+    "US Industry Comparisons of Mean Total Annual Earnings and Proportional Bonuses",
+    fontface = 'bold',
+    x = 0,
+    hjust = 0
+  ) +
+  theme(
+    # add margin on the left of the drawing canvas,
+    # so title is aligned with left edge of first plot
+    plot.margin = margin(0, 0, 0, 7)
+  )
+
+plot_grid(
+  title, plot_row,
+  ncol = 1,
+  # rel_heights values control vertical title margins
+  rel_heights = c(0.1, 1)
+)
 ```
 
-![](20210518---Ask-a-Manager-Survey_files/figure-gfm/unnamed-chunk-7-1.png)<!-- -->
+![](20210518---Ask-a-Manager-Survey_files/figure-gfm/unnamed-chunk-6-1.png)<!-- -->
+
+### Which industries have the highest income?
+
+### Which industries have the highest proporional bonuses?
+
+The phrase “bonus” is used here as a shorthand for “other monetary
+compensation”, as there is little difference for most industries.
+However, there are some clear interesting trends here. “Sales” making
+the top of the list is no surprise as commission is built into their
+employment contracts. A similar principle stands for “retail” and
+“property or construction” (i.e. real estate).
 
 ## What factors drive salary?
 
 ### How does age correlate with salary?
+
+``` r
+salaries <- sv %>%
+  mutate(
+    how_old_are_you = str_replace(how_old_are_you, "under 18", "18-18"),
+    how_old_are_you = str_replace(how_old_are_you, "65 or over", "65-65")
+  ) %>%
+  separate(how_old_are_you, into = c("min_age", "max_age"), sep = "-", remove = FALSE) %>%
+  mutate(
+    mean_age = (as.numeric(min_age) + as.numeric(max_age))/2,
+    years_of_experience_in_field = str_replace(years_of_experience_in_field, "\\s-\\s", "-"),
+    years_of_experience_in_field = str_remove(years_of_experience_in_field, "\\syears"),
+    years_of_experience_in_field = str_replace(years_of_experience_in_field, "1 year or less", "0-1")
+  ) %>%
+  separate(years_of_experience_in_field, into = c("min_years", "max_years"), sep = "-", remove = FALSE) %>%
+  mutate(
+    mean_years_of_experience = (as.numeric(min_years) + as.numeric(max_years))/2,
+    how_old_are_you = str_replace(how_old_are_you, "18-18", "Under 18"),
+    how_old_are_you = str_replace(how_old_are_you, "65-65", "65 or Over")
+  )
+```
+
+``` r
+salaries %>%
+  filter(
+    total_annual_earnings < 100000000,
+    gender %in% c("Man", "Woman")
+  ) %>%
+  group_by(gender, how_old_are_you, mean_age) %>%
+  dplyr::summarise(
+    responses = n(),
+    mean_annual_earnings = mean(total_annual_earnings)
+  ) %>%
+  ggplot(aes(fct_reorder(how_old_are_you, mean_age), mean_annual_earnings)) + 
+  geom_bar(aes(fill = gender), stat = "identity", position = "dodge", color = "gray20") + 
+  scale_fill_manual(values = c(
+    "Man" = "dodgerblue",
+    "Woman" = "hotpink"
+  )) + 
+  labs(
+    title = "Woman in manager positions reach a lower salary plateau than men, and earlier",
+    x = "Age",
+    y = "Mean Total Annual Earnings",
+    fill = "Gender"
+  ) + 
+  theme_bw() + 
+  theme(
+    legend.position = "bottom",
+    panel.grid.major.x = element_blank()
+  )
+```
+
+![](20210518---Ask-a-Manager-Survey_files/figure-gfm/unnamed-chunk-8-1.png)<!-- -->
 
 ### How does years of experience relate to salary?
 
@@ -183,5 +259,7 @@ industries %>%
 ### Do men or women earn more money?
 
 ### Do white people make more money than non-white people?
+
+## What areas of the country have the highest salary?
 
 # Machine Learning: Predict Salary
