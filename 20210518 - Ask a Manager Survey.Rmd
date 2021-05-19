@@ -44,7 +44,7 @@ sv <- survey %>%
 colnames(sv)
 ```
 
-# Questions
+# Exploratory Analysis
 
 ## Group by industry
 
@@ -147,3 +147,5 @@ industries %>%
 ### Do men or women earn more money?
 
 ### Do white people make more money than non-white people?
+
+# Machine Learning: Predict Salary

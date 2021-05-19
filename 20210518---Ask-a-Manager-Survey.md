@@ -59,7 +59,7 @@ colnames(sv)
     ## [19] "total_annual_earnings"                   
     ## [20] "bonus_proportion"
 
-# Questions
+# Exploratory Analysis
 
 ## Group by industry
 
@@ -183,3 +183,5 @@ industries %>%
 ### Do men or women earn more money?
 
 ### Do white people make more money than non-white people?
+
+# Machine Learning: Predict Salary
