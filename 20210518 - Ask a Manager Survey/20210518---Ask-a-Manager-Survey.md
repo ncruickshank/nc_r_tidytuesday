@@ -254,9 +254,85 @@ salaries %>%
 
 ### How does years of experience relate to salary?
 
+``` r
+salaries %>%
+  filter(
+    total_annual_earnings < 100000000,
+    gender %in% c("Man", "Woman")
+  ) %>%
+  group_by(gender, years_of_experience_in_field, mean_years_of_experience) %>%
+  dplyr::summarise(
+    responses = n(),
+    mean_annual_earnings = mean(total_annual_earnings)
+  ) %>%
+  ggplot(aes(fct_reorder(years_of_experience_in_field, mean_years_of_experience), mean_annual_earnings)) + 
+  geom_bar(aes(fill = gender), stat = "identity", position = "dodge", color = "gray20") + 
+  scale_fill_manual(values = c(
+    "Man" = "dodgerblue",
+    "Woman" = "hotpink"
+  )) + 
+  labs(
+    title = "Comparison of years of experience between the genders",
+    x = "Years of experience in the field",
+    y = "Mean Total Annual Earnings",
+    fill = "Gender"
+  ) + 
+  theme_bw() + 
+  theme(
+    legend.position = "bottom",
+    panel.grid.major.x = element_blank()
+  )
+```
+
+![](20210518---Ask-a-Manager-Survey_files/figure-gfm/unnamed-chunk-9-1.png)<!-- -->
+
 ### How does level of education relate to salary?
 
-### Do men or women earn more money?
+``` r
+salaries %>%
+  filter(
+    total_annual_earnings < 100000000,
+    gender %in% c("Man", "Woman"),
+    !(is.na(highest_level_of_education_completed))
+  ) %>%
+  mutate(
+    education_tier = case_when(
+      highest_level_of_education_completed == "High School" ~ 1,
+      highest_level_of_education_completed == "Some college" ~ 2,
+      highest_level_of_education_completed == "College degree" ~ 3,
+      highest_level_of_education_completed == "Master's degree" ~ 4,
+      highest_level_of_education_completed == "PhD" ~ 5,
+      highest_level_of_education_completed == "Professional degree (MD, JD, etc.)" ~ 6
+    ),
+    highest_level_of_education_completed = str_replace(highest_level_of_education_completed, 
+                                                       "Professional degree \\(MD, JD, etc.\\)",
+                                                       "Professional degree\n(MD, JD, etc.)") # so it fits better 
+  ) %>%
+  group_by(gender, highest_level_of_education_completed, education_tier) %>%
+  dplyr::summarise(
+    responses = n(),
+    mean_annual_earnings = mean(total_annual_earnings)
+  ) %>%
+  ggplot(aes(fct_reorder(highest_level_of_education_completed, education_tier), mean_annual_earnings)) + 
+  geom_bar(aes(fill = gender), stat = "identity", position = "dodge", color = "gray20") + 
+  scale_fill_manual(values = c(
+    "Man" = "dodgerblue",
+    "Woman" = "hotpink"
+  )) + 
+  labs(
+    title = "Gender comparison of the effect of education on salary",
+    x = "Education",
+    y = "Mean Total Annual Earnings",
+    fill = "Gender"
+  ) + 
+  theme_bw() + 
+  theme(
+    legend.position = "bottom",
+    panel.grid.major.x = element_blank()
+  )
+```
+
+![](20210518---Ask-a-Manager-Survey_files/figure-gfm/unnamed-chunk-10-1.png)<!-- -->
 
 ### Do white people make more money than non-white people?
 
