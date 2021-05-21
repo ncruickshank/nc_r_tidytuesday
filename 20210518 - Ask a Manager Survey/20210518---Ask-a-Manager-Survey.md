@@ -16,9 +16,17 @@ library(tidyverse)
 survey <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-05-18/survey.csv')
 ```
 
-    The salary survey a few weeks ago got a huge response — 24,000+ people shared their salaries and other info, which is a lot of raw data to sift through. Reader Elisabeth Engl kindly took the raw data and analyzed some of the trends in it and here’s what she found. (She asked me to note that she did this as a fun project to share some insights from the survey, rather than as a paid engagement.)
-    
-    This data does not reflect the general population; it reflects Ask a Manager readers who self-selected to respond, which is a very different group (as you can see just from the demographic breakdown below, which is very white and very female).
+The salary survey a few weeks ago got a huge response — 24,000+ people
+shared their salaries and other info, which is a lot of raw data to sift
+through. Reader Elisabeth Engl kindly took the raw data and analyzed
+some of the trends in it and here’s what she found. (She asked me to
+note that she did this as a fun project to share some insights from the
+survey, rather than as a paid engagement.)
+
+This data does not reflect the general population; it reflects Ask a
+Manager readers who self-selected to respond, which is a very different
+group (as you can see just from the demographic breakdown below, which
+is very white and very female).
 
 # Tidy Data Set
 
@@ -197,6 +205,27 @@ employment contracts. A similar principle stands for “retail” and
 
 ## What factors drive salary?
 
+``` r
+salaries <- sv %>%
+  mutate(
+    how_old_are_you = str_replace(how_old_are_you, "under 18", "18-18"),
+    how_old_are_you = str_replace(how_old_are_you, "65 or over", "65-65")
+  ) %>%
+  separate(how_old_are_you, into = c("min_age", "max_age"), sep = "-", remove = FALSE) %>%
+  mutate(
+    mean_age = (as.numeric(min_age) + as.numeric(max_age))/2,
+    years_of_experience_in_field = str_replace(years_of_experience_in_field, "\\s-\\s", "-"),
+    years_of_experience_in_field = str_remove(years_of_experience_in_field, "\\syears"),
+    years_of_experience_in_field = str_replace(years_of_experience_in_field, "1 year or less", "0-1")
+  ) %>%
+  separate(years_of_experience_in_field, into = c("min_years", "max_years"), sep = "-", remove = FALSE) %>%
+  mutate(
+    mean_years_of_experience = (as.numeric(min_years) + as.numeric(max_years))/2,
+    how_old_are_you = str_replace(how_old_are_you, "18-18", "Under 18"),
+    how_old_are_you = str_replace(how_old_are_you, "65-65", "65 or Over")
+  )
+```
+
 ### How does age correlate with salary?
 
 ``` r
@@ -221,7 +250,7 @@ salaries <- sv %>%
 ```
 
 ``` r
-salaries %>%
+gen_age_p <- salaries %>%
   filter(
     total_annual_earnings < 100000000,
     gender %in% c("Man", "Woman")
@@ -238,24 +267,18 @@ salaries %>%
     "Woman" = "hotpink"
   )) + 
   labs(
-    title = "Woman in manager positions reach a lower salary plateau than men, and earlier",
+    title = "Effect of age on salary",
     x = "Age",
-    y = "Mean Total Annual Earnings",
+    y = "US Dollars",
     fill = "Gender"
   ) + 
   theme_bw() + 
   theme(
-    legend.position = "bottom",
+    legend.position = "none",
     panel.grid.major.x = element_blank()
   )
-```
 
-![](20210518---Ask-a-Manager-Survey_files/figure-gfm/unnamed-chunk-8-1.png)<!-- -->
-
-### How does years of experience relate to salary?
-
-``` r
-salaries %>%
+gen_exp_p <- salaries %>%
   filter(
     total_annual_earnings < 100000000,
     gender %in% c("Man", "Woman")
@@ -272,24 +295,18 @@ salaries %>%
     "Woman" = "hotpink"
   )) + 
   labs(
-    title = "Comparison of years of experience between the genders",
+    title = "Effect of experience on salary",
     x = "Years of experience in the field",
-    y = "Mean Total Annual Earnings",
+    y = "US Dollars",
     fill = "Gender"
   ) + 
   theme_bw() + 
   theme(
-    legend.position = "bottom",
+    legend.position = "none",
     panel.grid.major.x = element_blank()
   )
-```
 
-![](20210518---Ask-a-Manager-Survey_files/figure-gfm/unnamed-chunk-9-1.png)<!-- -->
-
-### How does level of education relate to salary?
-
-``` r
-salaries %>%
+gen_edu_p <- salaries %>%
   filter(
     total_annual_earnings < 100000000,
     gender %in% c("Man", "Woman"),
@@ -320,19 +337,36 @@ salaries %>%
     "Woman" = "hotpink"
   )) + 
   labs(
-    title = "Gender comparison of the effect of education on salary",
+    title = "Effect of education on salary",
     x = "Education",
-    y = "Mean Total Annual Earnings",
+    y = "US Dollars",
     fill = "Gender"
   ) + 
   theme_bw() + 
   theme(
-    legend.position = "bottom",
+    legend.position = "none",
     panel.grid.major.x = element_blank()
   )
+
+gen_plot_row <- plot_grid(gen_age_p, gen_exp_p, gen_edu_p, ncol = 1)
+
+gen_title <- title <- ggdraw() + 
+  draw_label(
+    "Comparing various effects on total annual earnings of men (blue) & women (pink)",
+    fontface = 'bold',
+    x = 0,
+    hjust = 0
+  ) +
+  theme(
+    # add margin on the left of the drawing canvas,
+    # so title is aligned with left edge of first plot
+    plot.margin = margin(0, 0, 0, 7)
+  )
+
+plot_grid(gen_title, gen_plot_row, ncol = 1, rel_heights = c(0.1, 1))
 ```
 
-![](20210518---Ask-a-Manager-Survey_files/figure-gfm/unnamed-chunk-10-1.png)<!-- -->
+![](20210518---Ask-a-Manager-Survey_files/figure-gfm/unnamed-chunk-9-1.png)<!-- -->
 
 ### Do white people make more money than non-white people?
 
