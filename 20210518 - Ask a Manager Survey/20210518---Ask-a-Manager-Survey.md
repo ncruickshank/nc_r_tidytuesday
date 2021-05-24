@@ -7,6 +7,7 @@ Nick Cruickshank
 # Load Libraries
 library(cowplot)
 library(forcats)
+library(usmap)
 library(tidytuesdayR)
 library(tidyverse)
 ```
@@ -43,34 +44,9 @@ sv <- survey %>%
     # tidy industries
     industry = str_to_lower(industry)
     )
-  
-colnames(sv)
 ```
 
-    ##  [1] "timestamp"                               
-    ##  [2] "how_old_are_you"                         
-    ##  [3] "industry"                                
-    ##  [4] "job_title"                               
-    ##  [5] "additional_context_on_job_title"         
-    ##  [6] "annual_salary"                           
-    ##  [7] "other_monetary_comp"                     
-    ##  [8] "currency"                                
-    ##  [9] "currency_other"                          
-    ## [10] "additional_context_on_income"            
-    ## [11] "country"                                 
-    ## [12] "state"                                   
-    ## [13] "city"                                    
-    ## [14] "overall_years_of_professional_experience"
-    ## [15] "years_of_experience_in_field"            
-    ## [16] "highest_level_of_education_completed"    
-    ## [17] "gender"                                  
-    ## [18] "race"                                    
-    ## [19] "total_annual_earnings"                   
-    ## [20] "bonus_proportion"
-
 # Exploratory Analysis
-
-## Group by industry
 
 Looks like the survey must have allowed for open response in the
 industry field. I could manually group tidy the industries into to cut
@@ -94,14 +70,21 @@ sv %>%
   group_by(industry) %>%
   dplyr::summarise(responses = n()) %>%
   arrange(desc(responses)) %>%
-  head(50) %>%
+  head(30) %>%
   ggplot(aes(fct_reorder(industry, responses), responses)) + 
   geom_bar(stat = "identity") + 
-  geom_text(aes(label = responses), hjust = -1) +
-  coord_flip() + 
+  geom_text(aes(label = responses), vjust = -1) +
   labs(
     title = "Survey responses by industry",
-    x = ""
+    subtitle = "Filtering the survey responses for industries with > 50 responses should suffice for trimming",
+    x = "industry"
+  ) + 
+  theme_bw() +
+  theme(
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank()
   )
 ```
 
@@ -127,7 +110,35 @@ industries <- sv %>%
   )
 
 industries_list <- unique(industries$industry)
+
+industries %>%
+  arrange(desc(mean_salary)) %>%
+  mutate(
+    mean_salary = paste0("$", round(mean_salary / 1000, 2), "k"),
+    sd_salary = paste0("$", round(sd_salary / 1000, 2), "k"),
+    max_salary = paste0("$", round(max_salary / 1000, 2), "k"),
+    mean_proportional_bonus = paste0(round(100 * mean_proportional_bonus, 2), "%")
+  ) %>%
+  select(-min_salary) %>%
+  head(10) %>%
+  knitr::kable(align = 'c',
+               caption = "Summary statistics for the Top 10 Industries")
 ```
+
+|            industry            | responses | mean\_salary | sd\_salary | max\_salary | mean\_proportional\_bonus |
+| :----------------------------: | :-------: | :----------: | :--------: | :---------: | :-----------------------: |
+|       computing or tech        |   3509    |   $157.16k   |  $122.73k  |  $2196.15k  |           9.47%           |
+|              law               |    924    |   $136.13k   |  $107.45k  |   $1200k    |           6.55%           |
+|     business or consulting     |    650    |   $116.79k   |  $80.03k   |   $1270k    |           6.87%           |
+|         entertainment          |    190    |   $115.85k   |  $103.46k  |    $860k    |           5.38%           |
+| accounting, banking & finance  |   1389    |   $108.57k   |  $99.17k   |   $1615k    |           8.55%           |
+|  engineering or manufacturing  |   1293    |   $107.23k   |  $61.17k   |   $1100k    |           6.04%           |
+|             sales              |    222    |   $104.43k   |  $79.82k   |    $560k    |          16.13%           |
+| utilities & telecommunications |    243    |   $101.94k   |   $50.4k   |    $360k    |           7.47%           |
+|          health care           |   1498    |   $99.84k    |  $91.92k   |   $1900k    |           3.97%           |
+|  marketing, advertising & pr   |    877    |    $98.4k    |  $61.32k   |    $835k    |           5.35%           |
+
+Summary statistics for the Top 10 Industries
 
 ``` r
 income_plot <- industries %>%
@@ -192,10 +203,6 @@ plot_grid(
 
 ![](20210518---Ask-a-Manager-Survey_files/figure-gfm/unnamed-chunk-6-1.png)<!-- -->
 
-### Which industries have the highest income?
-
-### Which industries have the highest proporional bonuses?
-
 The phrase “bonus” is used here as a shorthand for “other monetary
 compensation”, as there is little difference for most industries.
 However, there are some clear interesting trends here. “Sales” making
@@ -203,30 +210,7 @@ the top of the list is no surprise as commission is built into their
 employment contracts. A similar principle stands for “retail” and
 “property or construction” (i.e. real estate).
 
-## What factors drive salary?
-
-``` r
-salaries <- sv %>%
-  mutate(
-    how_old_are_you = str_replace(how_old_are_you, "under 18", "18-18"),
-    how_old_are_you = str_replace(how_old_are_you, "65 or over", "65-65")
-  ) %>%
-  separate(how_old_are_you, into = c("min_age", "max_age"), sep = "-", remove = FALSE) %>%
-  mutate(
-    mean_age = (as.numeric(min_age) + as.numeric(max_age))/2,
-    years_of_experience_in_field = str_replace(years_of_experience_in_field, "\\s-\\s", "-"),
-    years_of_experience_in_field = str_remove(years_of_experience_in_field, "\\syears"),
-    years_of_experience_in_field = str_replace(years_of_experience_in_field, "1 year or less", "0-1")
-  ) %>%
-  separate(years_of_experience_in_field, into = c("min_years", "max_years"), sep = "-", remove = FALSE) %>%
-  mutate(
-    mean_years_of_experience = (as.numeric(min_years) + as.numeric(max_years))/2,
-    how_old_are_you = str_replace(how_old_are_you, "18-18", "Under 18"),
-    how_old_are_you = str_replace(how_old_are_you, "65-65", "65 or Over")
-  )
-```
-
-### How does age correlate with salary?
+## Gender vs Total Annual Earnings
 
 ``` r
 salaries <- sv %>%
@@ -366,10 +350,179 @@ gen_title <- title <- ggdraw() +
 plot_grid(gen_title, gen_plot_row, ncol = 1, rel_heights = c(0.1, 1))
 ```
 
-![](20210518---Ask-a-Manager-Survey_files/figure-gfm/unnamed-chunk-9-1.png)<!-- -->
+![](20210518---Ask-a-Manager-Survey_files/figure-gfm/unnamed-chunk-8-1.png)<!-- -->
 
-### Do white people make more money than non-white people?
+## Race vs Total Annual Earnings
 
-## What areas of the country have the highest salary?
+``` r
+race_list <- sv %>% 
+  filter(race != "Another option not listed here or prefer not to answer") %>%
+  group_by(race) %>%
+  dplyr::summarise(count = n()) %>%
+  arrange(desc(count)) %>%
+  head(4)
 
-# Machine Learning: Predict Salary
+sv_races <- sv %>%
+  filter(
+    race %in% unique(race_list$race),
+    total_annual_earnings < 100000000,
+    gender %in% c("Man", "Woman")
+  ) %>%
+  mutate(
+    how_old_are_you = str_replace(how_old_are_you, "under 18", "18-18"),
+    how_old_are_you = str_replace(how_old_are_you, "65 or over", "65-65")
+  ) %>%
+  separate(how_old_are_you, into = c("min_age", "max_age"), sep = "-", remove = FALSE) %>%
+  mutate(
+    mean_age = (as.numeric(min_age) + as.numeric(max_age))/2,
+    years_of_experience_in_field = str_replace(years_of_experience_in_field, "\\s-\\s", "-"),
+    years_of_experience_in_field = str_remove(years_of_experience_in_field, "\\syears"),
+    years_of_experience_in_field = str_replace(years_of_experience_in_field, "1 year or less", "0-1")
+  ) %>%
+  separate(years_of_experience_in_field, into = c("min_years", "max_years"), sep = "-", remove = FALSE) %>%
+  mutate(
+    mean_years_of_experience = (as.numeric(min_years) + as.numeric(max_years))/2,
+    how_old_are_you = str_replace(how_old_are_you, "18-18", "Under 18"),
+    how_old_are_you = str_replace(how_old_are_you, "65-65", "65 or Over"),
+    education_tier = case_when(
+      highest_level_of_education_completed == "High School" ~ 1,
+      highest_level_of_education_completed == "Some college" ~ 2,
+      highest_level_of_education_completed == "College degree" ~ 3,
+      highest_level_of_education_completed == "Master's degree" ~ 4,
+      highest_level_of_education_completed == "PhD" ~ 5,
+      highest_level_of_education_completed == "Professional degree (MD, JD, etc.)" ~ 6
+    ),
+    highest_level_of_education_completed = str_replace(highest_level_of_education_completed, 
+                                                       "Professional degree \\(MD, JD, etc.\\)",
+                                                       "Professional degree\n(MD, JD, etc.)"),
+    race = case_when(
+      str_detect(race, "Asian") == TRUE ~ "Asian",
+      str_detect(race, "Black") == TRUE ~ "African",
+      str_detect(race, "Latino") ~ "Latino",
+      str_detect(race, "White") ~ "White"
+    )
+  )
+```
+
+``` r
+races_age_p <- sv_races %>%
+  group_by(race, how_old_are_you, mean_age) %>%
+  dplyr::summarise(
+    earnings = mean(total_annual_earnings)
+  ) %>%
+  ggplot(aes(fct_reorder(how_old_are_you, mean_age), earnings)) + 
+  geom_bar(aes(fill = race), stat = "identity", position = "dodge", color = "gray20") + 
+  scale_fill_manual(values = c(
+    "African" = "tan4",
+    "Asian" = "lightgoldenrod2",
+    "Latino" = "burlywood3",
+    "White" = "navajowhite"
+  )) +
+  labs(
+    title = "Effect of Age on Salary",
+    x = "Age",
+    y = "US Dollars"
+  ) +
+  theme_bw() + 
+  theme(
+    legend.position = "none",
+    panel.grid.major.x = element_blank()
+  )
+
+races_exp_p <- sv_races %>%
+  group_by(race, years_of_experience_in_field, mean_years_of_experience) %>%
+  dplyr::summarise(
+    earnings = mean(total_annual_earnings)
+  ) %>%
+  ggplot(aes(fct_reorder(years_of_experience_in_field, mean_years_of_experience), earnings)) + 
+  geom_bar(aes(fill = race), stat = "identity", position = "dodge", color = "gray20") + 
+  scale_fill_manual(values = c(
+    "African" = "tan4",
+    "Asian" = "lightgoldenrod2",
+    "Latino" = "burlywood3",
+    "White" = "navajowhite"
+  )) +
+  labs(
+    title = "Effect of Experience on Salary",
+    x = "Age",
+    y = "US Dollars"
+  ) +
+  theme_bw() + 
+  theme(
+    legend.position = "none",
+    panel.grid.major.x = element_blank()
+  )
+
+races_edu_p <- sv_races %>%
+  filter(
+    !(is.na(highest_level_of_education_completed))
+  ) %>%
+  group_by(race, highest_level_of_education_completed, education_tier) %>%
+  dplyr::summarise(
+    earnings = mean(total_annual_earnings)
+  ) %>%
+  ggplot(aes(fct_reorder(highest_level_of_education_completed, education_tier), earnings)) + 
+  geom_bar(aes(fill = race), stat = "identity", position = "dodge", color = "gray20") + 
+  scale_fill_manual(values = c(
+    "African" = "tan4",
+    "Asian" = "lightgoldenrod2",
+    "Latino" = "burlywood3",
+    "White" = "navajowhite"
+  )) +
+  labs(
+    title = "Effect of Education on Salary",
+    x = "Age",
+    y = "US Dollars",
+    fill = "Race"
+  ) +
+  theme_bw() + 
+  theme(
+    legend.position = "bottom",
+    panel.grid.major.x = element_blank()
+  )
+
+race_plot_row <- plot_grid(races_age_p, races_exp_p, races_edu_p, ncol = 1)
+
+race_title <- title <- ggdraw() + 
+  draw_label(
+    "Comparing various effects on total annual earnings by race",
+    fontface = 'bold',
+    x = 0,
+    hjust = 0
+  ) +
+  theme(
+    # add margin on the left of the drawing canvas,
+    # so title is aligned with left edge of first plot
+    plot.margin = margin(0, 0, 0, 7)
+  )
+
+plot_grid(race_title, race_plot_row, ncol = 1, rel_heights = c(0.1, 1))
+```
+
+![](20210518---Ask-a-Manager-Survey_files/figure-gfm/unnamed-chunk-10-1.png)<!-- -->
+
+## State of Employment vs Salary
+
+``` r
+states <- tibble(state = state.name) %>%
+   bind_cols(tibble(abb = state.abb)) %>% 
+   bind_rows(tibble(state = "District of Columbia", abb = "DC"))
+
+sv_states <- sv %>%
+  filter(!(is.na(state))) %>%
+  group_by(state) %>%
+  dplyr::summarise(
+    responses = n(),
+    state_avg = round(mean(annual_salary) / 1000, 2)
+  ) %>%
+  filter(responses > 5) %>%
+  ungroup() %>%
+  left_join(states)
+
+plot_usmap(data = sv_states, values = "state_avg", color = "black") +
+  scale_fill_viridis_c(name = "Average Salary", label = scales::dollar_format(suffix = "k"), option = "viridis") +
+  labs(title = "Average annual salary by state") +
+  theme(legend.position = "right")
+```
+
+![](20210518---Ask-a-Manager-Survey_files/figure-gfm/unnamed-chunk-11-1.png)<!-- -->
