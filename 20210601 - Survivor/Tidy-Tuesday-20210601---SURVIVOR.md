@@ -20,6 +20,14 @@ challenges <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience
 viewers <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-06-01/viewers.csv')
 ```
 
+``` r
+# functions
+Mode <- function(x) {
+  ux <- unique(x)
+  ux[which.max(tabulate(match(x, ux)))]
+}
+```
+
 # Exploratory Analysis
 
 ## Summary
@@ -47,15 +55,7 @@ finale?
 
 ``` r
 # identify what the top five countries are for filling the graph
-top5_countries <- summary %>%
-  group_by(country) %>%
-  dplyr::summarise(
-    count = n()
-  ) %>%
-  arrange(desc(count)) %>%
-  head(5)
-
-list_top5_countries <- top5_countries$country
+list_top5_countries <- head(arrange(count(summary, vars = country), desc(n)), 5)$vars
 
 # reshape summary by country with "Other" category
 sum_pie_df <- summary %>%
@@ -137,7 +137,7 @@ summary_plot <- plot_grid(
 summary_plot
 ```
 
-![](Tidy-Tuesday-20210601---SURVIVOR_files/figure-gfm/unnamed-chunk-4-1.png)<!-- -->
+![](Tidy-Tuesday-20210601---SURVIVOR_files/figure-gfm/unnamed-chunk-5-1.png)<!-- -->
 
 Looks like overall mean viewership declined throughout the seasons (no
 surprise). Also, the variance in the delta between viewers at finale and
@@ -148,21 +148,111 @@ finishing the season once started.
 
 ``` r
 repeat_winners <- filter(count(summary, vars = full_name), n > 1)$vars
-seasons_with_returns <- nrow(filter(summary, str_detect(tribe_setup, "returning")))
+seasons_with_returns <- nrow(filter(summary, str_detect(tribe_setup, "(returning|past)")))
 ```
 
 Looking at the winners from each season, it is clear that there were
 only two repeat winners: Sandra Diaz-Twine, Tony Vlachos.
 
-Of the 40 seasons of Survivor, there were 9 seasons where returning
-players were allowed. From those 9 emerged 2 repeat winners: Sandra
+Of the 40 seasons of Survivor, there were 12 seasons where returning
+players were allowed. From those 12 emerged 2 repeat winners: Sandra
 Diaz-Twine, Tony Vlachos.
-
-### Any repeat winners?
 
 ## Challenges
 
+``` r
+head(challenges)
+```
+
+    ## # A tibble: 6 x 8
+    ##   season_name   season episode title    day challenge_type winners winning_tribe
+    ##   <chr>          <dbl>   <dbl> <chr>  <dbl> <chr>          <chr>   <chr>        
+    ## 1 Survivor: Wi~     40       1 Great~     2 reward         Amber   Dakal        
+    ## 2 Survivor: Wi~     40       1 Great~     2 reward         Tyson   Dakal        
+    ## 3 Survivor: Wi~     40       1 Great~     2 reward         Sandra  Dakal        
+    ## 4 Survivor: Wi~     40       1 Great~     2 reward         Yul     Dakal        
+    ## 5 Survivor: Wi~     40       1 Great~     2 reward         Wendell Dakal        
+    ## 6 Survivor: Wi~     40       1 Great~     2 reward         Sophie  Dakal
+
+``` r
+count(challenges, vars = challenge_type)
+```
+
+    ## # A tibble: 2 x 2
+    ##   vars         n
+    ##   <chr>    <int>
+    ## 1 immunity  2488
+    ## 2 reward    2535
+
 ## Castaways
+
+``` r
+castaways
+```
+
+    ## # A tibble: 744 x 18
+    ##    season_name season full_name castaway   age city  state personality_type
+    ##    <chr>        <dbl> <chr>     <chr>    <dbl> <chr> <chr> <chr>           
+    ##  1 Survivor: ~     40 Natalie ~ Natalie     33 Edge~ New ~ ESTP            
+    ##  2 Survivor: ~     40 Amber Ma~ Amber       40 Pens~ Flor~ ISFP            
+    ##  3 Survivor: ~     40 Danni Bo~ Danni       43 Shaw~ Kans~ ENFJ            
+    ##  4 Survivor: ~     40 Ethan Zo~ Ethan       45 Hill~ New ~ ISFP            
+    ##  5 Survivor: ~     40 Tyson Ap~ Tyson       39 Mesa  Ariz~ ESTP            
+    ##  6 Survivor: ~     40 Rob Mari~ Rob         43 Pens~ Flor~ ESTJ            
+    ##  7 Survivor: ~     40 Parvati ~ Parvati     36 Los ~ Cali~ ENFJ            
+    ##  8 Survivor: ~     40 Sandra D~ Sandra      44 Rive~ Flor~ ESTP            
+    ##  9 Survivor: ~     40 Yul Kwon  Yul         44 Los ~ Cali~ INTJ            
+    ## 10 Survivor: ~     40 Wendell ~ Wendell     35 Phil~ Penn~ INFJ            
+    ## # ... with 734 more rows, and 10 more variables: day <dbl>, order <dbl>,
+    ## #   result <chr>, jury_status <chr>, original_tribe <chr>, swapped_tribe <chr>,
+    ## #   swapped_tribe2 <chr>, merged_tribe <chr>, total_votes_received <dbl>,
+    ## #   immunity_idols_won <dbl>
+
+**Relevant features**
+
+Primary: Age, state, personality\_type, result Secondary: Total Votes
+Received, Immunity Idols Won
+
+### Age by Season
+
+``` r
+castaways_sum <- castaways %>%
+  group_by(season) %>%
+  dplyr::summarise(
+    players = n_distinct(full_name),
+    mode_personality = Mode(personality_type),
+    min_age = min(age),
+    mean_age = mean(age),
+    max_age = max(age)
+  )
+```
+
+``` r
+castaways %>%
+  ggplot(aes(season, age)) + 
+  geom_boxplot(aes(group = season))
+```
+
+![](Tidy-Tuesday-20210601---SURVIVOR_files/figure-gfm/unnamed-chunk-11-1.png)<!-- -->
+
+``` r
+  # color by ???
+  ## personality type
+```
+
+``` r
+castaways_sum %>%
+  ggplot(aes(season, mean_age)) + 
+  geom_bar(aes(fill = mode_personality), stat = "identity")
+```
+
+![](Tidy-Tuesday-20210601---SURVIVOR_files/figure-gfm/unnamed-chunk-12-1.png)<!-- -->
+
+``` r
+  # would be more meaningful as personality of winner rather than mode personality
+```
+
+### Result by Personality Type
 
 ## Viewers
 
