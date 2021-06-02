@@ -1,0 +1,202 @@
+---
+title: "Tidy Tuesday 20210601 - SURVIVOR"
+author: "Nick Cruickshank"
+date: "6/1/2021"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning=FALSE)
+```
+
+```{r}
+# libraries
+library(cowplot)
+library(ggrepel)
+library(readr)
+library(tidyverse)
+```
+
+```{r}
+# data
+summary <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-06-01/summary.csv')
+castaways <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-06-01/castaways.csv')
+jury_votes <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-06-01/jury_votes.csv')
+challenges <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-06-01/challenges.csv')
+viewers <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-06-01/viewers.csv')
+```
+
+```{r}
+# functions
+Mode <- function(x) {
+  ux <- unique(x)
+  ux[which.max(tabulate(match(x, ux)))]
+}
+```
+
+# Exploratory Analysis
+
+## Summary
+
+```{r}
+head(summary)
+```
+
+Which season had the greatest disparity between viewers at premier vs at finale?
+
+```{r fig.height=5, fig.width=10}
+# identify what the top five countries are for filling the graph
+list_top5_countries <- head(arrange(count(summary, vars = country), desc(n)), 5)$vars
+
+# reshape summary by country with "Other" category
+sum_pie_df <- summary %>%
+  mutate(
+    country_category = ifelse(country %in% list_top5_countries, country, "Other")
+  ) %>%
+  group_by(country_category) %>%
+  dplyr::summarise(value = n())
+
+# colors to use by country
+countries_colors <- c(
+  "Brazil" = "limegreen",
+  "Fiji" = "deepskyblue",
+  "Nicaragua" = "royalblue",
+  "Other" = "gray50",
+  "Panama" = "red",
+  "Philippines" = "gold"
+)
+
+# create plots
+## pie chart and legen
+sum_pie <- ggplot(sum_pie_df, aes(x = "", y = value, fill = country_category)) + 
+  geom_bar(stat = "identity", color = "gray20") + 
+  coord_polar("y", start = 0) + 
+  scale_fill_manual(values = countries_colors) + 
+  labs(title = "Location Breakdown", fill = "Country") +
+  theme_void() + 
+  theme(legend.position = "bottom")
+
+## viewership delta
+sum_delta_plot <- summary %>%
+  mutate(
+    viewer_delta = viewers_finale - viewers_premier,
+    country_category = ifelse(country %in% list_top5_countries, country, "Other")
+  ) %>%
+  ggplot(aes(season, viewer_delta)) + 
+  geom_line(aes(season, viewers_mean)) +
+  ggrepel::geom_text_repel(
+    data = filter(summary, season == 20),
+    aes(season, viewers_mean), label = "Mean episode viewership\nper season"
+    ) +
+  geom_bar(aes(fill = country_category), stat = "identity", color = "gray20") +
+  scale_fill_manual(values = countries_colors) +
+  labs(
+    title = "Difference between viewers at finale and viewers at premiere",
+    x = "Season",
+    y = "Viewers (millions)"
+  ) + 
+  theme_minimal() +
+  theme(
+    legend.position = "none",
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank()
+  )
+
+# put the two plots together
+plots_row <- plot_grid(sum_pie, sum_delta_plot, rel_widths = c(1,2))
+
+title <- ggdraw() + 
+  draw_label(
+    "Survivor summary throughout the seasons",
+    fontface = 'bold',
+    x = 0,
+    hjust = 0
+  ) +
+  theme(
+    # add margin on the left of the drawing canvas,
+    # so title is aligned with left edge of first plot
+    plot.margin = margin(0, 0, 0, 7)
+  )
+
+summary_plot <- plot_grid(
+  title, plots_row,
+  ncol = 1,
+  # rel_heights values control vertical title margins
+  rel_heights = c(0.1, 1)
+)
+
+summary_plot
+```
+
+Looks like overall mean viewership declined throughout the seasons (no surprise). Also, the variance in the delta between viewers at finale and viewers at premiere dropped off over time. I interpret this as demonstrating that the people who watched the later seasons of the show were already enfranchised, and were thus more likely to commit to finishing the season once started.
+
+```{r}
+repeat_winners <- filter(count(summary, vars = full_name), n > 1)$vars
+seasons_with_returns <- nrow(filter(summary, str_detect(tribe_setup, "(returning|past)")))
+```
+
+Looking at the winners from each season, it is clear that there were only two repeat winners: `r repeat_winners`.
+
+Of the `r nrow(summary)` seasons of Survivor, there were `r seasons_with_returns` seasons where returning players were allowed. From those `r seasons_with_returns` emerged `r length(repeat_winners)` repeat winners: `r repeat_winners`.
+
+## Challenges
+
+```{r}
+head(challenges)
+```
+
+```{r}
+count(challenges, vars = challenge_type)
+```
+
+## Castaways
+
+```{r}
+castaways
+```
+
+__Relevant features__
+
+Primary: Age, state, personality_type, result
+Secondary: Total Votes Received, Immunity Idols Won
+
+### Age by Season
+
+```{r}
+castaways_sum <- castaways %>%
+  group_by(season) %>%
+  dplyr::summarise(
+    players = n_distinct(full_name),
+    mode_personality = Mode(personality_type),
+    min_age = min(age),
+    mean_age = mean(age),
+    max_age = max(age)
+  )
+```
+
+```{r}
+castaways %>%
+  ggplot(aes(season, age)) + 
+  geom_boxplot(aes(group = season))
+  # color by ???
+  ## personality type
+```
+
+```{r}
+castaways_sum %>%
+  ggplot(aes(season, mean_age)) + 
+  geom_bar(aes(fill = mode_personality), stat = "identity")
+  # would be more meaningful as personality of winner rather than mode personality
+```
+
+
+### Result by Personality Type
+
+
+
+## Viewers
+
+## Jury Votes
+
+
+
