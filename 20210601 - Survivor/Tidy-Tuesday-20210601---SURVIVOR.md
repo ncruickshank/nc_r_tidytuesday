@@ -6,8 +6,10 @@ Nick Cruickshank
 ``` r
 # libraries
 library(cowplot)
+library(forcats)
 library(ggrepel)
 library(readr)
+library(tidytext)
 library(tidyverse)
 ```
 
@@ -228,32 +230,196 @@ castaways_sum <- castaways %>%
 ```
 
 ``` r
-castaways %>%
-  ggplot(aes(season, age)) + 
-  geom_boxplot(aes(group = season))
+viewers %>%
+  group_by(season) %>%
+  dplyr::summarise(season_rating = round(mean(rating_18_49, na.rm = TRUE), 2)) %>%
+  ggplot(aes(season, season_rating)) + 
+  geom_point()
 ```
 
 ![](Tidy-Tuesday-20210601---SURVIVOR_files/figure-gfm/unnamed-chunk-11-1.png)<!-- -->
+
+``` r
+castaways %>%
+  ggplot(aes(season, age)) + 
+  geom_boxplot(aes(group = season)) +
+  labs(
+    title = "Survivor: Distribution of castaway ages throughout the seasons",
+    x = "Season",
+    y = "Age"
+  ) + 
+  theme_minimal() + 
+  theme(
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank()
+  )
+```
+
+![](Tidy-Tuesday-20210601---SURVIVOR_files/figure-gfm/unnamed-chunk-11-2.png)<!-- -->
 
 ``` r
   # color by ???
   ## personality type
 ```
 
+### Personality Type by Season
+
 ``` r
-castaways_sum %>%
-  ggplot(aes(season, mean_age)) + 
-  geom_bar(aes(fill = mode_personality), stat = "identity")
+castaways %>%
+  filter(!(is.na(personality_type))) %>%
+  count(season, personality_type) %>%
+  ggplot(aes(season, n, fill = personality_type)) + 
+  geom_bar(stat = "identity", position = "fill") + 
+  labs(
+    title = "Survivor: Distribution of personality types by season",
+    fill = "Personality Type"
+  ) + 
+  theme_void()
 ```
 
 ![](Tidy-Tuesday-20210601---SURVIVOR_files/figure-gfm/unnamed-chunk-12-1.png)<!-- -->
 
-``` r
-  # would be more meaningful as personality of winner rather than mode personality
-```
-
 ### Result by Personality Type
 
+``` r
+#df<-df%>%mutate(MyQuantileBins = cut(MyContinuous, 
+#                                 breaks = unique(quantile(MyContinuous,probs=seq.int(0,1, by=1/numbers_of_bins))), 
+#                                                 include.lowest=TRUE))
+
+# as.numeric(cut2(das$wt, g=3))
+
+castaway_result_noise <- filter(count(castaways, result), n < 10)$result
+number_of_bins <- 3
+
+castaway_personality <- castaways %>%
+  filter(
+    !(result %in% castaway_result_noise),
+    !(is.na(personality_type))
+    ) %>%
+  group_by(personality_type) %>%
+  dplyr::summarise(
+    `Percent of castaways who won the season` = 100*(sum(result == "Sole Survivor") / n()),
+    `Percent of castaways who were finalists (winners and runner-ups)` = 100*(sum(str_detect(str_to_lower(result), "(runner-up|sole survivor)")) / n()),
+    `Staying Power (sum of order squared, divided by count)` = sum(order^2) / n(),
+  )
+
+castaway_personality %>%
+  pivot_longer(cols = -personality_type, names_to = "success_metric", values_to = "rate") %>%
+  ggplot(aes(reorder_within(personality_type, rate, success_metric), rate)) + 
+  geom_bar(aes(fill = success_metric), stat = "identity") + 
+  scale_x_reordered() + 
+  facet_wrap(~ success_metric, ncol = 1, scales = "free") + 
+  labs(
+    title = "Survivor: Which personality type was most succesful?",
+    x = "Personality Type",
+    y = ""
+  ) +
+  theme_minimal() + 
+  theme(
+    legend.position = "none",
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank()
+  )
+```
+
+![](Tidy-Tuesday-20210601---SURVIVOR_files/figure-gfm/unnamed-chunk-13-1.png)<!-- -->
+
+### Where did all the castaways come from?
+
+Plot chloropleth map per capita.
+
 ## Viewers
+
+``` r
+viewers
+```
+
+    ## # A tibble: 596 x 9
+    ##    season_name season episode_number_~ episode title episode_date viewers
+    ##    <chr>        <dbl>            <dbl>   <dbl> <chr> <date>         <dbl>
+    ##  1 Survivor: ~     40              583       1 Grea~ 2020-02-12      6.68
+    ##  2 Survivor: ~     40              584       2 It's~ 2020-02-19      7.16
+    ##  3 Survivor: ~     40              585       3 Out ~ 2020-02-26      7.14
+    ##  4 Survivor: ~     40              586       4 I Li~ 2020-03-04      7.08
+    ##  5 Survivor: ~     40              587       5 The ~ 2020-03-11      6.91
+    ##  6 Survivor: ~     40              588       6 Quic~ 2020-03-18      7.83
+    ##  7 Survivor: ~     40              589       7 We'r~ 2020-03-25      8.18
+    ##  8 Survivor: ~     40              590       8 This~ 2020-04-01      8.23
+    ##  9 Survivor: ~     40              591       9 War ~ 2020-04-08      7.85
+    ## 10 Survivor: ~     40              592      10 The ~ 2020-04-15      8.14
+    ## # ... with 586 more rows, and 2 more variables: rating_18_49 <dbl>,
+    ## #   share_18_49 <dbl>
+
+### Viewership over the course of a season
+
+What is the average viewer ship pattern over the course of a season?
+
+``` r
+viewers %>%
+  group_by(season) %>%
+  dplyr::summarise(
+    season_start = min(episode),
+    season_end = max(episode)
+  ) %>%
+  ggplot(aes(season, season_end)) + 
+  geom_line()
+```
+
+![](Tidy-Tuesday-20210601---SURVIVOR_files/figure-gfm/unnamed-chunk-15-1.png)<!-- -->
+
+``` r
+viewers %>%
+  filter(episode < 17) %>%
+  group_by(episode) %>%
+  dplyr::summarise(
+    mean_viewers = mean(viewers, na.rm = TRUE) 
+  ) %>%
+  ggplot(aes(episode, mean_viewers)) + 
+  geom_line()
+```
+
+![](Tidy-Tuesday-20210601---SURVIVOR_files/figure-gfm/unnamed-chunk-15-2.png)<!-- -->
+
+Same question, but for ratings
+
+``` r
+viewers %>%
+  ggplot(aes(episode_number_overall, rating_18_49)) + 
+  geom_line()
+```
+
+![](Tidy-Tuesday-20210601---SURVIVOR_files/figure-gfm/unnamed-chunk-16-1.png)<!-- -->
+
+``` r
+viewers %>%
+  ggplot(aes(episode_number_overall, viewers)) + 
+  geom_line()
+```
+
+![](Tidy-Tuesday-20210601---SURVIVOR_files/figure-gfm/unnamed-chunk-17-1.png)<!-- -->
+
+``` r
+viewers %>%
+  group_by(season) %>%
+  dplyr::summarise(
+    mean_rating = mean(rating_18_49, na.rm = TRUE),
+    mean_viewers = mean(viewers, na.rm = TRUE)
+  ) %>%
+  ggplot(aes(mean_viewers, mean_rating)) + 
+  geom_point() + 
+  geom_smooth(method = "lm")
+```
+
+![](Tidy-Tuesday-20210601---SURVIVOR_files/figure-gfm/unnamed-chunk-18-1.png)<!-- -->
+
+``` r
+res <- lm(viewers$rating_18_49 ~ viewers$viewers)
+RSS <- c(crossprod(res$residuals))
+MSE <- RSS / length(res$residuals)
+RMSE <- sqrt(MSE)
+RMSE
+```
+
+    ## [1] 1.957598
 
 ## Jury Votes

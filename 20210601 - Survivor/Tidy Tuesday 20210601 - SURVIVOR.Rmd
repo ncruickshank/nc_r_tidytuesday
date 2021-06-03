@@ -12,8 +12,10 @@ knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning=FALSE)
 ```{r}
 # libraries
 library(cowplot)
+library(forcats)
 library(ggrepel)
 library(readr)
+library(tidytext)
 library(tidyverse)
 ```
 
@@ -175,26 +177,157 @@ castaways_sum <- castaways %>%
 ```
 
 ```{r}
+viewers %>%
+  group_by(season) %>%
+  dplyr::summarise(season_rating = round(mean(rating_18_49, na.rm = TRUE), 2)) %>%
+  ggplot(aes(season, season_rating)) + 
+  geom_point()
+
 castaways %>%
   ggplot(aes(season, age)) + 
-  geom_boxplot(aes(group = season))
+  geom_boxplot(aes(group = season)) +
+  labs(
+    title = "Survivor: Distribution of castaway ages throughout the seasons",
+    x = "Season",
+    y = "Age"
+  ) + 
+  theme_minimal() + 
+  theme(
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank()
+  )
   # color by ???
   ## personality type
 ```
 
+### Personality Type by Season
+
 ```{r}
-castaways_sum %>%
-  ggplot(aes(season, mean_age)) + 
-  geom_bar(aes(fill = mode_personality), stat = "identity")
-  # would be more meaningful as personality of winner rather than mode personality
+castaways %>%
+  filter(!(is.na(personality_type))) %>%
+  count(season, personality_type) %>%
+  ggplot(aes(season, n, fill = personality_type)) + 
+  geom_bar(stat = "identity", position = "fill") + 
+  labs(
+    title = "Survivor: Distribution of personality types by season",
+    fill = "Personality Type"
+  ) + 
+  theme_void()
 ```
 
 
 ### Result by Personality Type
 
+```{r fig.height=8, fig.width=10}
+#df<-df%>%mutate(MyQuantileBins = cut(MyContinuous, 
+#                                 breaks = unique(quantile(MyContinuous,probs=seq.int(0,1, by=1/numbers_of_bins))), 
+#                                                 include.lowest=TRUE))
 
+# as.numeric(cut2(das$wt, g=3))
+
+castaway_result_noise <- filter(count(castaways, result), n < 10)$result
+number_of_bins <- 3
+
+castaway_personality <- castaways %>%
+  filter(
+    !(result %in% castaway_result_noise),
+    !(is.na(personality_type))
+    ) %>%
+  group_by(personality_type) %>%
+  dplyr::summarise(
+    `Percent of castaways who won the season` = 100*(sum(result == "Sole Survivor") / n()),
+    `Percent of castaways who were finalists (winners and runner-ups)` = 100*(sum(str_detect(str_to_lower(result), "(runner-up|sole survivor)")) / n()),
+    `Staying Power (sum of order squared, divided by count)` = sum(order^2) / n(),
+  )
+
+castaway_personality %>%
+  pivot_longer(cols = -personality_type, names_to = "success_metric", values_to = "rate") %>%
+  ggplot(aes(reorder_within(personality_type, rate, success_metric), rate)) + 
+  geom_bar(aes(fill = success_metric), stat = "identity") + 
+  scale_x_reordered() + 
+  facet_wrap(~ success_metric, ncol = 1, scales = "free") + 
+  labs(
+    title = "Survivor: Which personality type was most succesful?",
+    x = "Personality Type",
+    y = ""
+  ) +
+  theme_minimal() + 
+  theme(
+    legend.position = "none",
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank()
+  )
+```
+
+### Where did all the castaways come from?
+
+Plot chloropleth map per capita.
 
 ## Viewers
+
+```{r}
+viewers
+```
+
+### Viewership over the course of a season
+
+What is the average viewer ship pattern over the course of a season?
+
+```{r}
+viewers %>%
+  group_by(season) %>%
+  dplyr::summarise(
+    season_start = min(episode),
+    season_end = max(episode)
+  ) %>%
+  ggplot(aes(season, season_end)) + 
+  geom_line()
+
+viewers %>%
+  filter(episode < 17) %>%
+  group_by(episode) %>%
+  dplyr::summarise(
+    mean_viewers = mean(viewers, na.rm = TRUE) 
+  ) %>%
+  ggplot(aes(episode, mean_viewers)) + 
+  geom_line()
+```
+
+
+Same question, but for ratings
+
+```{r}
+viewers %>%
+  ggplot(aes(episode_number_overall, rating_18_49)) + 
+  geom_line()
+```
+
+```{r}
+viewers %>%
+  ggplot(aes(episode_number_overall, viewers)) + 
+  geom_line()
+```
+
+```{r}
+viewers %>%
+  group_by(season) %>%
+  dplyr::summarise(
+    mean_rating = mean(rating_18_49, na.rm = TRUE),
+    mean_viewers = mean(viewers, na.rm = TRUE)
+  ) %>%
+  ggplot(aes(mean_viewers, mean_rating)) + 
+  geom_point() + 
+  geom_smooth(method = "lm")
+```
+
+```{r}
+res <- lm(viewers$rating_18_49 ~ viewers$viewers)
+RSS <- c(crossprod(res$residuals))
+MSE <- RSS / length(res$residuals)
+RMSE <- sqrt(MSE)
+RMSE
+```
+
 
 ## Jury Votes
 
