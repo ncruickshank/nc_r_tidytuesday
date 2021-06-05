@@ -35,22 +35,21 @@ Mode <- function(x) {
 ## Summary
 
 ``` r
-head(summary)
+knitr::kable(head(summary),
+             align = 'c',
+             caption = "Head of summary table")
 ```
 
-    ## # A tibble: 6 x 19
-    ##   season_name season location country tribe_setup full_name winner runner_ups
-    ##   <chr>        <dbl> <chr>    <chr>   <chr>       <chr>     <chr>  <chr>     
-    ## 1 Survivor: ~      1 Pulau T~ Malays~ Two tribes~ Richard ~ Richa~ Kelly Wig~
-    ## 2 Survivor: ~      2 Herbert~ Austra~ Two tribes~ Tina Wes~ Tina   Colby Don~
-    ## 3 Survivor: ~      3 Shaba N~ Kenya   Two tribes~ Ethan Zo~ Ethan  Kim Johns~
-    ## 4 Survivor: ~      4 Nuku Hi~ Polyne~ Two tribes~ Vecepia ~ Vecep~ Neleh Den~
-    ## 5 Survivor: ~      5 Ko Taru~ Thaila~ Two tribes~ Brian He~ Brian  Clay Jord~
-    ## 6 Survivor: ~      6 Rio Neg~ Brazil  Two tribes~ Jenna Mo~ Jenna  Matthew V~
-    ## # ... with 11 more variables: final_vote <chr>, timeslot <chr>,
-    ## #   premiered <date>, ended <date>, filming_started <date>,
-    ## #   filming_ended <date>, viewers_premier <dbl>, viewers_finale <dbl>,
-    ## #   viewers_reunion <dbl>, viewers_mean <dbl>, rank <dbl>
+|           season\_name           | season |                        location                        |  country  |                           tribe\_setup                            |   full\_name   | winner  |     runner\_ups      | final\_vote |     timeslot      | premiered  |   ended    | filming\_started | filming\_ended | viewers\_premier | viewers\_finale | viewers\_reunion | viewers\_mean | rank |
+| :------------------------------: | :----: | :----------------------------------------------------: | :-------: | :---------------------------------------------------------------: | :------------: | :-----: | :------------------: | :---------: | :---------------: | :--------: | :--------: | :--------------: | :------------: | :--------------: | :-------------: | :--------------: | :-----------: | :--: |
+|         Survivor: Borneo         |   1    |              Pulau Tiga, Sabah, Malaysia               | Malaysia  |                  Two tribes of eight new players                  | Richard Hatch  | Richard |  Kelly Wiglesworth   |     4-3     | Wednesday 8:00 pm | 2000-05-31 | 2000-08-23 |    2000-03-13    |   2000-04-20   |      15.51       |      51.69      |      36.70       |     28.30     |  2   |
+| Survivor: The Australian Outback |   2    | Herbert River at Goshen Station, Queensland, Australia | Australia |                  Two tribes of eight new players                  |  Tina Wesson   |  Tina   |   Colby Donaldson    |     4-3     | Thursday 8:00 pm  | 2001-01-28 | 2001-05-03 |    2000-10-23    |   2000-12-03   |      45.37       |      36.35      |      28.01       |     29.80     |  1   |
+|         Survivor: Africa         |   3    |             Shaba National Reserve, Kenya              |   Kenya   |                  Two tribes of eight new players                  |   Ethan Zohn   |  Ethan  |     Kim Johnson      |     5-2     | Thursday 8:00 pm  | 2001-10-11 | 2002-01-10 |    2001-07-11    |   2001-08-18   |      23.84       |      27.26      |      19.05       |     20.69     |  8   |
+|       Survivor: Marquesas        |   4    |     Nuku Hiva, Marquesas Islands, French Polynesia     | Polynesia |                  Two tribes of eight new players                  | Vecepia Towery | Vecepia |     Neleh Dennis     |     4-3     | Thursday 8:00 pm  | 2002-02-28 | 2002-05-19 |    2001-11-12    |   2001-12-20   |      23.19       |      25.87      |      19.05       |     20.77     |  6   |
+|        Survivor: Thailand        |   5    |          Ko Tarutao, Satun Province, Thailand          | Thailand  | Two tribes of eight new players; picked by the two oldest players |  Brian Heidik  |  Brian  |     Clay Jordan      |     4-3     | Thursday 8:00 pm  | 2002-09-19 | 2002-12-19 |    2002-06-10    |   2002-07-18   |      23.05       |      24.08      |      20.43       |     21.21     |  4   |
+|       Survivor: The Amazon       |   6    |              Rio Negro, Amazonas, Brazil               |  Brazil   |         Two tribes of eight new players divided by gender         | Jenna Morasca  |  Jenna  | Matthew Von Ertfelda |     6-1     | Thursday 8:00 pm  | 2003-02-13 | 2003-05-11 |    2002-11-07    |   2002-12-15   |      23.26       |      22.29      |      20.43       |     19.97     |  9   |
+
+Head of summary table
 
 Which season had the greatest disparity between viewers at premier vs at
 finale?
@@ -124,15 +123,12 @@ title <- ggdraw() +
     hjust = 0
   ) +
   theme(
-    # add margin on the left of the drawing canvas,
-    # so title is aligned with left edge of first plot
     plot.margin = margin(0, 0, 0, 7)
   )
 
 summary_plot <- plot_grid(
   title, plots_row,
   ncol = 1,
-  # rel_heights values control vertical title margins
   rel_heights = c(0.1, 1)
 )
 
@@ -163,57 +159,47 @@ Diaz-Twine, Tony Vlachos.
 ## Challenges
 
 ``` r
-head(challenges)
+knitr::kable(head(challenges),
+             align = 'c',
+             caption = "Head of challenges table")
 ```
 
-    ## # A tibble: 6 x 8
-    ##   season_name   season episode title    day challenge_type winners winning_tribe
-    ##   <chr>          <dbl>   <dbl> <chr>  <dbl> <chr>          <chr>   <chr>        
-    ## 1 Survivor: Wi~     40       1 Great~     2 reward         Amber   Dakal        
-    ## 2 Survivor: Wi~     40       1 Great~     2 reward         Tyson   Dakal        
-    ## 3 Survivor: Wi~     40       1 Great~     2 reward         Sandra  Dakal        
-    ## 4 Survivor: Wi~     40       1 Great~     2 reward         Yul     Dakal        
-    ## 5 Survivor: Wi~     40       1 Great~     2 reward         Wendell Dakal        
-    ## 6 Survivor: Wi~     40       1 Great~     2 reward         Sophie  Dakal
+|       season\_name       | season | episode |         title          | day | challenge\_type | winners | winning\_tribe |
+| :----------------------: | :----: | :-----: | :--------------------: | :-: | :-------------: | :-----: | :------------: |
+| Survivor: Winners at War |   40   |    1    | Greatest of the Greats |  2  |     reward      |  Amber  |     Dakal      |
+| Survivor: Winners at War |   40   |    1    | Greatest of the Greats |  2  |     reward      |  Tyson  |     Dakal      |
+| Survivor: Winners at War |   40   |    1    | Greatest of the Greats |  2  |     reward      | Sandra  |     Dakal      |
+| Survivor: Winners at War |   40   |    1    | Greatest of the Greats |  2  |     reward      |   Yul   |     Dakal      |
+| Survivor: Winners at War |   40   |    1    | Greatest of the Greats |  2  |     reward      | Wendell |     Dakal      |
+| Survivor: Winners at War |   40   |    1    | Greatest of the Greats |  2  |     reward      | Sophie  |     Dakal      |
 
-``` r
-count(challenges, vars = challenge_type)
-```
+Head of challenges table
 
-    ## # A tibble: 2 x 2
-    ##   vars         n
-    ##   <chr>    <int>
-    ## 1 immunity  2488
-    ## 2 reward    2535
+Nothing here really interests me. Maybe could join this table with
+another to see relationships between `challenge type` and some other
+metrics (e.g. viewers, ratings, castaway personality type, etc).
+However, there are only two challenge types, both of which seem
+relatively evenly distributed. Specifically, there are 2535 reward
+challenges and 2488 immnity challenges.
 
 ## Castaways
 
 ``` r
-castaways
+knitr::kable(head(castaways),
+             align = 'c',
+             caption = "Head of castaways table")
 ```
 
-    ## # A tibble: 744 x 18
-    ##    season_name season full_name castaway   age city  state personality_type
-    ##    <chr>        <dbl> <chr>     <chr>    <dbl> <chr> <chr> <chr>           
-    ##  1 Survivor: ~     40 Natalie ~ Natalie     33 Edge~ New ~ ESTP            
-    ##  2 Survivor: ~     40 Amber Ma~ Amber       40 Pens~ Flor~ ISFP            
-    ##  3 Survivor: ~     40 Danni Bo~ Danni       43 Shaw~ Kans~ ENFJ            
-    ##  4 Survivor: ~     40 Ethan Zo~ Ethan       45 Hill~ New ~ ISFP            
-    ##  5 Survivor: ~     40 Tyson Ap~ Tyson       39 Mesa  Ariz~ ESTP            
-    ##  6 Survivor: ~     40 Rob Mari~ Rob         43 Pens~ Flor~ ESTJ            
-    ##  7 Survivor: ~     40 Parvati ~ Parvati     36 Los ~ Cali~ ENFJ            
-    ##  8 Survivor: ~     40 Sandra D~ Sandra      44 Rive~ Flor~ ESTP            
-    ##  9 Survivor: ~     40 Yul Kwon  Yul         44 Los ~ Cali~ INTJ            
-    ## 10 Survivor: ~     40 Wendell ~ Wendell     35 Phil~ Penn~ INFJ            
-    ## # ... with 734 more rows, and 10 more variables: day <dbl>, order <dbl>,
-    ## #   result <chr>, jury_status <chr>, original_tribe <chr>, swapped_tribe <chr>,
-    ## #   swapped_tribe2 <chr>, merged_tribe <chr>, total_votes_received <dbl>,
-    ## #   immunity_idols_won <dbl>
+|       season\_name       | season |    full\_name    | castaway | age |     city     |     state     | personality\_type | day | order |    result     |  jury\_status   | original\_tribe | swapped\_tribe | swapped\_tribe2 | merged\_tribe | total\_votes\_received | immunity\_idols\_won |
+| :----------------------: | :----: | :--------------: | :------: | :-: | :----------: | :-----------: | :---------------: | :-: | :---: | :-----------: | :-------------: | :-------------: | :------------: | :-------------: | :-----------: | :--------------------: | :------------------: |
+| Survivor: Winners at War |   40   | Natalie Anderson | Natalie  | 33  |  Edgewater   |  New Jersey   |       ESTP        |  2  |   1   | 1st voted out |       NA        |      Sele       |       NA       |       NA        |      NA       |           11           |          1           |
+| Survivor: Winners at War |   40   |  Amber Mariano   |  Amber   | 40  |  Pensacola   |    Florida    |       ISFP        |  3  |   2   | 2nd voted out | 1st jury member |      Dakal      |       NA       |       NA        |      NA       |           6            |          0           |
+| Survivor: Winners at War |   40   | Danni Boatwright |  Danni   | 43  |   Shawnee    |    Kansas     |       ENFJ        |  6  |   3   | 3rd voted out | 2nd jury member |      Sele       |       NA       |       NA        |      NA       |           8            |          0           |
+| Survivor: Winners at War |   40   |    Ethan Zohn    |  Ethan   | 45  | Hillsborough | New Hampshire |       ISFP        |  9  |   4   | 4th voted out | 3rd jury member |      Sele       |       NA       |       NA        |      NA       |           4            |          0           |
+| Survivor: Winners at War |   40   |  Tyson Apostol   |  Tyson   | 39  |     Mesa     |    Arizona    |       ESTP        | 11  |   5   | 5th voted out |       NA        |      Dakal      |       NA       |       NA        |      NA       |           12           |          0           |
+| Survivor: Winners at War |   40   |   Rob Mariano    |   Rob    | 43  |  Pensacola   |    Florida    |       ESTJ        | 14  |   6   | 6th voted out | 4th jury member |      Sele       |      Yara      |       NA        |      NA       |           4            |          0           |
 
-**Relevant features**
-
-Primary: Age, state, personality\_type, result Secondary: Total Votes
-Received, Immunity Idols Won
+Head of castaways table
 
 ### Age by Season
 
@@ -228,16 +214,6 @@ castaways_sum <- castaways %>%
     max_age = max(age)
   )
 ```
-
-``` r
-viewers %>%
-  group_by(season) %>%
-  dplyr::summarise(season_rating = round(mean(rating_18_49, na.rm = TRUE), 2)) %>%
-  ggplot(aes(season, season_rating)) + 
-  geom_point()
-```
-
-![](Tidy-Tuesday-20210601---SURVIVOR_files/figure-gfm/unnamed-chunk-11-1.png)<!-- -->
 
 ``` r
 castaways %>%
@@ -255,41 +231,38 @@ castaways %>%
   )
 ```
 
-![](Tidy-Tuesday-20210601---SURVIVOR_files/figure-gfm/unnamed-chunk-11-2.png)<!-- -->
+![](Tidy-Tuesday-20210601---SURVIVOR_files/figure-gfm/unnamed-chunk-10-1.png)<!-- -->
+
+For the above boxplot, it is possible to assign color of the graph to
+season rating or viewers. However, this would be substantially
+confounded by the fact that both factors went down over time. At that
+point, it would be plotting two different mesaures (season by age, and
+season by viewers), and potentially suggesting a false causality.
+Therefore, this was not done.
+
+### Result by Personality Type
 
 ``` r
-  # color by ???
-  ## personality type
-```
-
-### Personality Type by Season
-
-``` r
-castaways %>%
+personality_type_distr <- castaways %>%
   filter(!(is.na(personality_type))) %>%
   count(season, personality_type) %>%
   ggplot(aes(season, n, fill = personality_type)) + 
   geom_bar(stat = "identity", position = "fill") + 
   labs(
-    title = "Survivor: Distribution of personality types by season",
-    fill = "Personality Type"
+    title = "Personality type distribution\nby Survivor season",
+    fill = "Legend",
+    y = "",
+    x = "Season"
   ) + 
-  theme_void()
-```
-
-![](Tidy-Tuesday-20210601---SURVIVOR_files/figure-gfm/unnamed-chunk-12-1.png)<!-- -->
-
-### Result by Personality Type
-
-``` r
-#df<-df%>%mutate(MyQuantileBins = cut(MyContinuous, 
-#                                 breaks = unique(quantile(MyContinuous,probs=seq.int(0,1, by=1/numbers_of_bins))), 
-#                                                 include.lowest=TRUE))
-
-# as.numeric(cut2(das$wt, g=3))
+  coord_flip() +
+  scale_x_reverse() + 
+  theme_minimal() + 
+  theme(
+    panel.grid = element_blank(),
+    axis.text.x = element_blank()
+  )
 
 castaway_result_noise <- filter(count(castaways, result), n < 10)$result
-number_of_bins <- 3
 
 castaway_personality <- castaways %>%
   filter(
@@ -303,14 +276,14 @@ castaway_personality <- castaways %>%
     `Staying Power (sum of order squared, divided by count)` = sum(order^2) / n(),
   )
 
-castaway_personality %>%
+personality_success_plot <- castaway_personality %>%
   pivot_longer(cols = -personality_type, names_to = "success_metric", values_to = "rate") %>%
   ggplot(aes(reorder_within(personality_type, rate, success_metric), rate)) + 
   geom_bar(aes(fill = success_metric), stat = "identity") + 
   scale_x_reordered() + 
   facet_wrap(~ success_metric, ncol = 1, scales = "free") + 
   labs(
-    title = "Survivor: Which personality type was most succesful?",
+    title = "Which personality type was most succesful in Survivor?",
     x = "Personality Type",
     y = ""
   ) +
@@ -320,106 +293,143 @@ castaway_personality %>%
     panel.grid.major.x = element_blank(),
     panel.grid.minor.x = element_blank()
   )
+
+plot_grid(personality_success_plot, personality_type_distr, 
+          rel_widths = c(2.7,1))
 ```
 
-![](Tidy-Tuesday-20210601---SURVIVOR_files/figure-gfm/unnamed-chunk-13-1.png)<!-- -->
-
-### Where did all the castaways come from?
-
-Plot chloropleth map per capita.
+![](Tidy-Tuesday-20210601---SURVIVOR_files/figure-gfm/unnamed-chunk-11-1.png)<!-- -->
 
 ## Viewers
 
 ``` r
-viewers
+knitr::kable(head(viewers),
+             align = 'c',
+             caption = "Viewers table head")
 ```
 
-    ## # A tibble: 596 x 9
-    ##    season_name season episode_number_~ episode title episode_date viewers
-    ##    <chr>        <dbl>            <dbl>   <dbl> <chr> <date>         <dbl>
-    ##  1 Survivor: ~     40              583       1 Grea~ 2020-02-12      6.68
-    ##  2 Survivor: ~     40              584       2 It's~ 2020-02-19      7.16
-    ##  3 Survivor: ~     40              585       3 Out ~ 2020-02-26      7.14
-    ##  4 Survivor: ~     40              586       4 I Li~ 2020-03-04      7.08
-    ##  5 Survivor: ~     40              587       5 The ~ 2020-03-11      6.91
-    ##  6 Survivor: ~     40              588       6 Quic~ 2020-03-18      7.83
-    ##  7 Survivor: ~     40              589       7 We'r~ 2020-03-25      8.18
-    ##  8 Survivor: ~     40              590       8 This~ 2020-04-01      8.23
-    ##  9 Survivor: ~     40              591       9 War ~ 2020-04-08      7.85
-    ## 10 Survivor: ~     40              592      10 The ~ 2020-04-15      8.14
-    ## # ... with 586 more rows, and 2 more variables: rating_18_49 <dbl>,
-    ## #   share_18_49 <dbl>
+|       season\_name       | season | episode\_number\_overall | episode |            title             | episode\_date | viewers | rating\_18\_49 | share\_18\_49 |
+| :----------------------: | :----: | :----------------------: | :-----: | :--------------------------: | :-----------: | :-----: | :------------: | :-----------: |
+| Survivor: Winners at War |   40   |           583            |    1    |    Greatest of the Greats    |  2020-02-12   |  6.68   |      1.3       |       7       |
+| Survivor: Winners at War |   40   |           584            |    2    | It’s Like a Survivor Economy |  2020-02-19   |  7.16   |      1.4       |       7       |
+| Survivor: Winners at War |   40   |           585            |    3    |        Out for Blood         |  2020-02-26   |  7.14   |      1.4       |       7       |
+| Survivor: Winners at War |   40   |           586            |    4    |        I Like Revenge        |  2020-03-04   |  7.08   |      1.4       |       7       |
+| Survivor: Winners at War |   40   |           587            |    5    | The Buddy System on Steroids |  2020-03-11   |  6.91   |      1.4       |       6       |
+| Survivor: Winners at War |   40   |           588            |    6    |      Quick on the Draw       |  2020-03-18   |  7.83   |      1.6       |       7       |
 
-### Viewership over the course of a season
+Viewers table head
 
-What is the average viewer ship pattern over the course of a season?
+### Viewership and ratings over the course of a season
 
 ``` r
-viewers %>%
-  group_by(season) %>%
-  dplyr::summarise(
-    season_start = min(episode),
-    season_end = max(episode)
+# viewers plot
+viewers_season_plot <- viewers %>%
+  filter(
+    episode < 17,
+    !(is.na(viewers))
   ) %>%
-  ggplot(aes(season, season_end)) + 
-  geom_line()
-```
-
-![](Tidy-Tuesday-20210601---SURVIVOR_files/figure-gfm/unnamed-chunk-15-1.png)<!-- -->
-
-``` r
-viewers %>%
-  filter(episode < 17) %>%
   group_by(episode) %>%
   dplyr::summarise(
-    mean_viewers = mean(viewers, na.rm = TRUE) 
+    mean_viewers = mean(viewers),
+    sd_viewers = sd(viewers)
   ) %>%
   ggplot(aes(episode, mean_viewers)) + 
-  geom_line()
-```
+  geom_line(color = "goldenrod4") + 
+  geom_area(fill = "gold") + 
+  coord_cartesian(ylim = c(12, 20)) + 
+  labs(
+    title = "Viewers throughout an average season",
+    x = "Episode",
+    y = "Average Viewers (millions)"
+  ) + 
+  theme_minimal()
 
-![](Tidy-Tuesday-20210601---SURVIVOR_files/figure-gfm/unnamed-chunk-15-2.png)<!-- -->
-
-Same question, but for ratings
-
-``` r
-viewers %>%
-  ggplot(aes(episode_number_overall, rating_18_49)) + 
-  geom_line()
-```
-
-![](Tidy-Tuesday-20210601---SURVIVOR_files/figure-gfm/unnamed-chunk-16-1.png)<!-- -->
-
-``` r
-viewers %>%
-  ggplot(aes(episode_number_overall, viewers)) + 
-  geom_line()
-```
-
-![](Tidy-Tuesday-20210601---SURVIVOR_files/figure-gfm/unnamed-chunk-17-1.png)<!-- -->
-
-``` r
-viewers %>%
-  group_by(season) %>%
-  dplyr::summarise(
-    mean_rating = mean(rating_18_49, na.rm = TRUE),
-    mean_viewers = mean(viewers, na.rm = TRUE)
+# top viewed seasons
+top_viewed_plots <- viewers %>%
+  group_by(season_name, season) %>%
+  dplyr::summarise(mean_viewers = mean(viewers, na.rm = TRUE)) %>%
+  arrange(desc(mean_viewers)) %>%
+  head(10) %>%
+  mutate(
+    season_tidy = paste0("S", season),
+    season_name_tidy = str_remove(season_name, "Survivor: ")
   ) %>%
-  ggplot(aes(mean_viewers, mean_rating)) + 
-  geom_point() + 
-  geom_smooth(method = "lm")
+  ggplot(aes(fct_reorder(season_tidy, mean_viewers), mean_viewers)) + 
+  geom_bar(stat = "identity", fill = "gold", color = "goldenrod4", alpha = 0.2) + 
+  geom_text(aes(label = season_name_tidy, y = 0), size = 3, hjust = "left", color = "goldenrod4") + 
+  geom_text(aes(label = round(mean_viewers)), hjust = 1.5, color = "goldenrod4") + 
+  coord_flip() + 
+  labs(
+    title = "Most Viewed Season (millions)",
+    x = "",
+    y = ""
+  ) + 
+  theme_minimal() + 
+  theme(
+    panel.grid = element_blank(),
+    axis.text.x = element_blank()
+  )
+
+# rating plot
+ratings_season_plot <- viewers %>%
+  filter(
+    episode < 17, 
+    !(is.na(rating_18_49))
+  ) %>%
+  group_by(episode) %>%
+  dplyr::summarise(mean_rating = mean(rating_18_49)) %>%
+  ggplot(aes(episode, mean_rating)) + 
+  geom_line() + 
+  geom_area(fill = "darkorange", color = "darkorange4") + 
+  coord_cartesian(ylim = c(3.4, 4.4)) + 
+  labs(
+    title = "Ratings throughout an average season",
+    x = "Episode",
+    y = "Average Rating"
+  ) + 
+  theme_minimal()
+
+# top rated seasons
+top_rated_seasons_plot <- viewers %>%
+  group_by(season_name, season) %>%
+  dplyr::summarise(mean_rating = mean(rating_18_49, na.rm = TRUE)) %>%
+  arrange(desc(mean_rating)) %>%
+  head(10) %>%
+  mutate(
+    season_tidy = paste0("S", season),
+    season_name_tidy = str_remove(season_name, "Survivor: "),
+    ) %>%
+  ggplot(aes(fct_reorder(season_tidy, mean_rating), mean_rating)) + 
+  geom_bar(stat = "identity", fill = "darkorange", color = "darkorange4", alpha = 0.2) + 
+  geom_text(aes(label = season_name_tidy, y = 0), size = 3, hjust = "left", color = "darkorange4") +
+  geom_text(aes(label = round(mean_rating, 1)), hjust = 1.5, color = "darkorange4") +
+  coord_flip() + 
+  labs(
+    title = "Highest Rated Seasons",
+    x = "",
+    y = ""
+  ) + 
+  theme_minimal() + 
+  theme(
+    panel.grid = element_blank(),
+    axis.text.x = element_blank()
+  )
+
+# merge all four plots together
+plots_row <- plot_grid(viewers_season_plot, top_viewed_plots, ratings_season_plot, top_rated_seasons_plot,
+          ncol = 2, rel_widths = c(2.2,1))
+
+title <- ggdraw() + 
+  draw_label(
+    "Survivor viewers and ratings by the season",
+    fontface = "bold", x = 0, hjust = 0
+  ) + 
+  theme(
+    plot.margin = margin(0,0,0,7)
+  )
+
+viewers_plot <- plot_grid(title, plots_row, ncol = 1, rel_heights = c(0.1,1))
+viewers_plot
 ```
 
-![](Tidy-Tuesday-20210601---SURVIVOR_files/figure-gfm/unnamed-chunk-18-1.png)<!-- -->
-
-``` r
-res <- lm(viewers$rating_18_49 ~ viewers$viewers)
-RSS <- c(crossprod(res$residuals))
-MSE <- RSS / length(res$residuals)
-RMSE <- sqrt(MSE)
-RMSE
-```
-
-    ## [1] 1.957598
-
-## Jury Votes
+![](Tidy-Tuesday-20210601---SURVIVOR_files/figure-gfm/unnamed-chunk-13-1.png)<!-- -->
