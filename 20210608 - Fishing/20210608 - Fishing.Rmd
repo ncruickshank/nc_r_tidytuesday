@@ -1,0 +1,80 @@
+---
+title: "20210608 - Fishing"
+author: "Nick Cruickshank"
+date: "6/8/2021"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning=FALSE)
+```
+
+```{r}
+# libraries
+library(forcats)
+library(readr)
+library(tidyverse)
+```
+
+```{r}
+# data
+fishing <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-06-08/fishing.csv')
+stocked <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-06-08/stocked.csv')
+```
+
+Why are "Total Canada (ONT)", "U.S. Total (MI)", and others included in this dataset?
+
+```{r}
+sort(unique(fishing$region))
+
+fishing %>%
+  group_by(region) %>%
+  dplyr::summarise(
+    sum_grand_total = sum(grand_total, na.rm = TRUE),
+    sum_values = sum(values, na.rm = TRUE)) %>%
+  mutate(category = ifelse(str_detect(region, "Total"), "total", "not total")) %>%
+  ggplot(aes(fct_reorder(region, sum_values), sum_values)) +
+  geom_bar(aes(fill = category), stat = "identity") + 
+  coord_flip() + 
+  labs(
+    title = "Why are there 'total' regions in the dataset?",
+    subtitle = "Are there double counts?"
+  )
+```
+
+I think we can cut the following regions: 'U.S. Total', 'Canada (ONT)', 'WI State Total', 'MI State Total', and 'U.S. Total (MI)'. 'Total Canada (ONT)' looks like a fishy name (pun intended), but the actual count looks more legitimate than 'Canada (ONT)'.
+
+```{r}
+# tidy daya
+fishing %>%
+  mutate(
+    species = str_to_lower(species)
+  )
+```
+
+
+# Exploratory Anaylsis
+
+## Fishing Data
+
+```{r}
+fishing %>%
+  group_by(species) %>%
+  dplyr::summarise(
+    sum_grand_total = sum(grand_total, na.rm = TRUE),
+    sum_value = sum(values, na.rm = TRUE)
+    ) %>%
+  arrange(desc(sum_grand_total))
+  
+  ggplot(aes(year, grand_total)) + 
+  geom_point(aes(color = lake))
+```
+
+### Most common species for each lake
+
+## Stocked Data
+
+```{r}
+stocked
+```
+
