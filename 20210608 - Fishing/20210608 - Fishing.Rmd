@@ -11,8 +11,10 @@ knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning=FALSE)
 
 ```{r}
 # libraries
+library(cowplot)
 library(forcats)
 library(readr)
+library(tidytext)
 library(tidyverse)
 ```
 
@@ -21,6 +23,15 @@ library(tidyverse)
 fishing <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-06-08/fishing.csv')
 stocked <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-06-08/stocked.csv')
 ```
+
+```{r}
+# functions
+Mode <- function(x) {
+  ux <- unique(x)
+  ux[which.max(tabulate(match(x, ux)))]
+}
+```
+
 
 Why are "Total Canada (ONT)", "U.S. Total (MI)", and others included in this dataset?
 
@@ -42,13 +53,21 @@ fishing %>%
   )
 ```
 
-I think we can cut the following regions: 'U.S. Total', 'Canada (ONT)', 'WI State Total', 'MI State Total', and 'U.S. Total (MI)'. 'Total Canada (ONT)' looks like a fishy name (pun intended), but the actual count looks more legitimate than 'Canada (ONT)'.
+I think we can cut the following regions: 'U.S. Total', 'Canada (ONT)', 'WI State Total', 'MI State Total', and 'U.S. Total (MI)'. 'Total Canada (ONT)' looks like a fishy name (pun intended), but the actual count looks more legitimate than 'Canada (ONT)'.  
+
+Preliminary exploratory analysis revealed that the species "cisco" and "chub" were sometimes combined to "cisco and chub" or "cisco and chubs". Easiest way to handle this was to just combine all instances of "cisco" and "chub" into the overarching group "cisco and "chub" (as well as unifying the pluralization). This phase of the project also revealed that the `lake` Saint Clair was vastly underrepresented in the `fishing` dataset. Further, it kind of throws off the narrative of comparing the five great lakes. As such, it was filtered out.
+
+
 
 ```{r}
 # tidy daya
-fishing %>%
+fish_df <- fishing %>%
+  filter(
+    lake != "Saint Clair"
+  ) %>%
   mutate(
-    species = str_to_lower(species)
+    species = str_to_lower(species),
+    species = ifelse(species %in% c("chubs", "cisco", "cisco and chubs"), "cisco and chub", species)
   )
 ```
 
@@ -57,20 +76,67 @@ fishing %>%
 
 ## Fishing Data
 
-```{r}
-fishing %>%
-  group_by(species) %>%
+### Analysis of top species by lake
+
+```{r fig.height=12, fig.width=20}
+# top fish by lake
+fishing_top_species_df <- fish_df %>%
+  group_by(lake, species) %>%
   dplyr::summarise(
-    sum_grand_total = sum(grand_total, na.rm = TRUE),
-    sum_value = sum(values, na.rm = TRUE)
-    ) %>%
-  arrange(desc(sum_grand_total))
-  
-  ggplot(aes(year, grand_total)) + 
-  geom_point(aes(color = lake))
+    sum_values = sum(values, na.rm = TRUE)
+  ) %>%
+  top_n(5, sum_values) %>%
+  arrange(lake, desc(sum_values)) 
+
+top_fish_list <- unique(fishing_top_species_df$species)
+
+top_fish_plot <- fishing_top_species_df %>%
+  ggplot(aes(reorder_within(species, sum_values, lake), sum_values)) + 
+  geom_bar(aes(fill = species), stat = "identity", color = "navy") + 
+  labs(
+    title = "Fish species with the top production value",
+    x = "",
+    y = "Total Value (pounds)"
+  ) +
+  scale_x_reordered() +
+  scale_fill_brewer(palette = "Set3") + 
+  coord_flip() +
+  facet_wrap(~ lake, scales = "free", ncol = 1) + 
+  theme_bw() + 
+  theme(
+    legend.position = "none"
+  )
+
+# time series analysis of top fish by lake
+## consider modifying the species column to replace all non-top species with "Other"
+## will maybe improve data vis, but will also throw off the brewer palette.
+fish_time_plot <- fish_df %>%
+  filter(
+    species %in% top_fish_list
+  ) %>%
+  #mutate(
+  #  species = ifelse(species %in% top_fish_list, species, "Other")
+  #) %>%
+  ggplot(aes(year, values)) + 
+  geom_bar(aes(group = species, fill = species), stat = "identity") + 
+  scale_fill_brewer(palette = "Set3") + 
+  labs(
+    title = "Time series analysis of the top fish species",
+    x = "Year",
+    y = "Values (pounds)"
+  ) +
+  facet_wrap(~ lake, ncol = 1, scales = "free") + 
+  theme_bw() + 
+  theme(
+    legend.position = "none"
+  )
+
+top_fish_plots <- plot_grid(top_fish_plot, fish_time_plot, rel_widths = c(1,3), ncol = 2)
+
+top_fish_plots
 ```
 
-### Most common species for each lake
+WHy have cisco and chub gone down in recent years?
 
 ## Stocked Data
 
