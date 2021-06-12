@@ -309,7 +309,7 @@ top_fish_plots <- plot_grid(top_fish_plot, fish_time_plot, rel_widths = c(1,3), 
 
 ## Merge all plots together into infograph
 
-```{r fig.height=25, fig.width=20}
+```{r great_lakes_fishing_infographic, fig.height=25, fig.width=20}
 # infographic title
 fish_texts <- ggdraw() + 
   draw_label(
