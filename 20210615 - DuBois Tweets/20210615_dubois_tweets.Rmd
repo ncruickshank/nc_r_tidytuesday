@@ -150,16 +150,5 @@ tweet_time_plot <- df %>%
 tweet_time_plot
 ```
 
-## Top Tweets
-
-```{r}
-# include conditional coloring based on retweets and quote count
-# include value on average like count
-# include the body of the tweet iteself
-
-# is there a relationship between number of followers and likes? (spoilers, probably yes)
-# is there a relationship between verified status and likes?
-# is there a relationship between number of words in the body of the tweet and number of likes?
-```
 
 
