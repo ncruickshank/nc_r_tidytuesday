@@ -5,14 +5,15 @@ date: "6/17/2021"
 output: github_document
 ---
 
-```{r setup, include=FALSE, message=FALSE, warning=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning=FALSE)
 ```
 
 ```{r}
 # libraries
 library(readr)
 library(rworldmap)
+library(tidycensus)
 library(tidyverse)
 library(tigris)
 library(usmap)
@@ -47,7 +48,12 @@ bz <- broadband_zip %>%
     )) %>%
   mutate(
     zipcode = as.character(zipcode),
-    group = 1
+    group = 1,
+    broadband_category = case_when(
+      broadband_usage <= 0.1 ~ "<= 10%",
+      #broadband_usage < 0.9 ~ NULL,
+      broadband_usage >= 0.9 ~ ">= 90%"
+    )
     ) %>%
   left_join(latlong)
 ```
@@ -56,38 +62,41 @@ bz <- broadband_zip %>%
 
 ## Broadband Distribution by Country
 
-```{r}
+```{r fig.width=10}
 # this gets close, but can't figure out why it won't go by county
 bz_map <- bz %>%
-  select(fips, broadband_usage) 
+  filter(!(is.na(broadband_category))) %>%
+  select(fips, broadband_category) 
 
-plot_usmap(regions = "counties", data = bz_map, values = "broadband_usage") + 
-  scale_fill_viridis_c() + 
+#plot_usmap(regions = "states", ata = bz_map, color = "black", size = 1.5) + 
+plot_usmap(regions = "counties", data = bz_map, values = "broadband_category", color = "white", size = 0.1) + 
+  scale_fill_manual(values = c(
+    "<= 10%" = "dodgerblue",
+    ">= 90%" = "gold"
+  )) +
   labs(
     title = "Broadband Internet Access in America by County (as of October 2020)",
     fill = "Percent of people per county using broadband speed internet"
   ) + 
-  theme(legend.position = "bottom")
+  theme(
+    legend.position = "bottom",
+    plot.background = element_rect(fill = "slategray1")
+    )
 ```
 
+
+## Population by County
 
 ```{r}
-# state_codes <- data.frame(states()) %>%
-#   janitor::clean_names() %>%
-#   select(name, stusps) %>%
-#   rename(c("region" = "name",
-#            "st" = "stusps"))
-# 
-# bz2 <- broadband_zip %>%
-#   rename(c("subregion" = "county_name")) %>%
-#   left_join(state_codes) %>%
-#   mutate(
-#     region = str_to_lower(region),
-#     subregion = str_to_lower(subregion)
-#     )
-
+#data.frame(tigris::urban_areas())
 ```
 
 
-## Socioeconomic Status by County
+## Average Income By County
+
+
+## Population x Broadband by County
+
+
+## Income x Broadband by County
 

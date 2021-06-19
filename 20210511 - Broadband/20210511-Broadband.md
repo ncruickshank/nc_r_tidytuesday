@@ -6,97 +6,20 @@ Nick Cruickshank
 ``` r
 # libraries
 library(readr)
-```
-
-    ## Registered S3 methods overwritten by 'tibble':
-    ##   method     from  
-    ##   format.tbl pillar
-    ##   print.tbl  pillar
-
-``` r
 library(rworldmap)
-```
-
-    ## Warning: package 'rworldmap' was built under R version 3.6.3
-
-    ## Loading required package: sp
-
-    ## Warning: package 'sp' was built under R version 3.6.3
-
-    ## ### Welcome to rworldmap ###
-
-    ## For a short introduction type :   vignette('rworldmap')
-
-``` r
+library(tidycensus)
 library(tidyverse)
-```
-
-    ## -- Attaching packages ------------------------------------------------------------------------------------------------------------------------------------ tidyverse 1.3.0 --
-
-    ## v ggplot2 3.2.1     v dplyr   1.0.6
-    ## v tibble  2.1.3     v stringr 1.4.0
-    ## v tidyr   1.0.2     v forcats 0.4.0
-    ## v purrr   0.3.3
-
-    ## Warning: package 'dplyr' was built under R version 3.6.3
-
-    ## -- Conflicts --------------------------------------------------------------------------------------------------------------------------------------- tidyverse_conflicts() --
-    ## x dplyr::filter() masks stats::filter()
-    ## x dplyr::lag()    masks stats::lag()
-
-``` r
 library(tigris)
-```
-
-    ## To enable 
-    ## caching of data, set `options(tigris_use_cache = TRUE)` in your R script or .Rprofile.
-
-``` r
 library(usmap)
-```
-
-    ## Warning: package 'usmap' was built under R version 3.6.3
-
-``` r
 library(zipcodeR)
 ```
-
-    ## Warning: no function found corresponding to methods exports from 'raster' for:
-    ## 'wkt'
 
 ``` r
 # data
 broadband <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-05-11/broadband.csv') 
-```
-
-    ## Parsed with column specification:
-    ## cols(
-    ##   ST = col_character(),
-    ##   `COUNTY ID` = col_double(),
-    ##   `COUNTY NAME` = col_character(),
-    ##   `BROADBAND AVAILABILITY PER FCC` = col_character(),
-    ##   `BROADBAND USAGE` = col_character()
-    ## )
-
-``` r
 broadband <- broadband %>%
   janitor::clean_names()
 broadband_zip <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-05-11/broadband_zip.csv')
-```
-
-    ## Parsed with column specification:
-    ## cols(
-    ##   ST = col_character(),
-    ##   `COUNTY NAME` = col_character(),
-    ##   `COUNTY ID` = col_double(),
-    ##   `POSTAL CODE` = col_double(),
-    ##   `BROADBAND USAGE` = col_double(),
-    ##   `ERROR RANGE (MAE)(+/-)` = col_double(),
-    ##   `ERROR RANGE (95%)(+/-)` = col_double(),
-    ##   MSD = col_double()
-    ## )
-
-``` r
 broadband_zip <- broadband_zip %>%
   janitor::clean_names()
 ```
@@ -132,12 +55,15 @@ bz <- broadband_zip %>%
     )) %>%
   mutate(
     zipcode = as.character(zipcode),
-    group = 1
+    group = 1,
+    broadband_category = case_when(
+      broadband_usage <= 0.1 ~ "<= 10%",
+      #broadband_usage < 0.9 ~ NULL,
+      broadband_usage >= 0.9 ~ ">= 90%"
+    )
     ) %>%
   left_join(latlong)
 ```
-
-    ## Joining, by = "zipcode"
 
 # Exploratory Analysis
 
@@ -146,33 +72,35 @@ bz <- broadband_zip %>%
 ``` r
 # this gets close, but can't figure out why it won't go by county
 bz_map <- bz %>%
-  select(fips, broadband_usage) 
+  filter(!(is.na(broadband_category))) %>%
+  select(fips, broadband_category) 
 
-plot_usmap(regions = "counties", data = bz_map, values = "broadband_usage") + 
-  scale_fill_viridis_c() + 
+#plot_usmap(regions = "states", ata = bz_map, color = "black", size = 1.5) + 
+plot_usmap(regions = "counties", data = bz_map, values = "broadband_category", color = "white", size = 0.1) + 
+  scale_fill_manual(values = c(
+    "<= 10%" = "dodgerblue",
+    ">= 90%" = "gold"
+  )) +
   labs(
     title = "Broadband Internet Access in America by County (as of October 2020)",
     fill = "Percent of people per county using broadband speed internet"
   ) + 
-  theme(legend.position = "bottom")
+  theme(
+    legend.position = "bottom",
+    plot.background = element_rect(fill = "slategray1")
+    )
 ```
 
 ![](20210511-Broadband_files/figure-gfm/unnamed-chunk-4-1.png)<!-- -->
 
+## Population by County
+
 ``` r
-# state_codes <- data.frame(states()) %>%
-#   janitor::clean_names() %>%
-#   select(name, stusps) %>%
-#   rename(c("region" = "name",
-#            "st" = "stusps"))
-# 
-# bz2 <- broadband_zip %>%
-#   rename(c("subregion" = "county_name")) %>%
-#   left_join(state_codes) %>%
-#   mutate(
-#     region = str_to_lower(region),
-#     subregion = str_to_lower(subregion)
-#     )
+#data.frame(tigris::urban_areas())
 ```
 
-## Socioeconomic Status by County
+## Average Income By County
+
+## Population x Broadband by County
+
+## Income x Broadband by County
