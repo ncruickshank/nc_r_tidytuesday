@@ -5,6 +5,7 @@ Nick Cruickshank
 
 ``` r
 # libraries
+library(glue)
 library(readr)
 library(rworldmap)
 library(tidycensus)
@@ -22,6 +23,11 @@ broadband <- broadband %>%
 broadband_zip <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-05-11/broadband_zip.csv')
 broadband_zip <- broadband_zip %>%
   janitor::clean_names()
+```
+
+``` r
+# functions
+RMSE <- function(error) {sqrt(mean(error^2))}
 ```
 
 # Introduction
@@ -47,6 +53,23 @@ on broadband data by country in America.
 
 ``` r
 latlong <- geocode_zip(broadband_zip$postal_code)
+
+## broadband
+bd <- broadband %>%
+  rename(c(
+    "state" = "st",
+    "fips" = "county_id"
+    )) %>%
+  mutate(
+    group = 1,
+    broadband_category = case_when(
+      broadband_usage <= 0.1 ~ "<= 10%",
+      broadband_usage < 0.9 ~ "> 10% and < 90%",
+      broadband_usage >= 0.9 ~ ">= 90%"
+    )
+  )
+
+## broadband zip
 bz <- broadband_zip %>%
   rename(c(
     "zipcode" = "postal_code",
@@ -65,42 +88,119 @@ bz <- broadband_zip %>%
   left_join(latlong)
 ```
 
-# Exploratory Analysis
-
-## Broadband Distribution by Country
+# Broadband Distribution by Country
 
 ``` r
-# this gets close, but can't figure out why it won't go by county
-bz_map <- bz %>%
-  filter(!(is.na(broadband_category))) %>%
-  select(fips, broadband_category) 
+bd_map <- bd %>%
+  select(fips, broadband_category)
 
-#plot_usmap(regions = "states", ata = bz_map, color = "black", size = 1.5) + 
-plot_usmap(regions = "counties", data = bz_map, values = "broadband_category", color = "white", size = 0.1) + 
-  scale_fill_manual(values = c(
-    "<= 10%" = "dodgerblue",
-    ">= 90%" = "gold"
-  )) +
+plot_usmap(regions = "counties", data = bd_map, values = "broadband_category", color = "navy", size = 0.1) + 
+  scale_fill_viridis_d() + 
   labs(
     title = "Broadband Internet Access in America by County (as of October 2020)",
     fill = "Percent of people per county using broadband speed internet"
   ) + 
   theme(
     legend.position = "bottom",
-    plot.background = element_rect(fill = "slategray1")
+    legend.background = element_rect(fill = "lightblue1"),
+    plot.background = element_rect(fill = "lightblue1")
     )
 ```
 
-![](20210511-Broadband_files/figure-gfm/unnamed-chunk-4-1.png)<!-- -->
+![](20210511-Broadband_files/figure-gfm/broadband_choropleth-1.png)<!-- -->
+
+# Comparing Broadband Access to Census Data
+
+``` r
+key <- as.character(read.delim("census_api_key.txt", header = FALSE)$V1)
+census_api_key(key)
+
+v19 <- load_variables(2019, "acs5", cache = TRUE)
+```
 
 ## Population by County
 
+### Choropleth
+
 ``` r
-#data.frame(tigris::urban_areas())
+census_pop <- get_acs(geography = "county",
+                  variables = c(total_pop = "B01003_001"),
+                  year = 2019) %>%
+  janitor::clean_names()
+
+pop_map <- census_pop %>%
+  rename(c(
+    "fips" = "geoid",
+    "total_pop" = "estimate"
+  )) %>%
+  mutate(
+    pop_category = case_when(
+      total_pop < 250000 ~ "(1) 0 - 250000",
+      total_pop < 500000 ~ "(2) 250000 - 500000",
+      total_pop < 750000 ~ "(3) 500000 - 750000",
+      total_pop < 1000000 ~ "(4) 750000 - 1000000",
+      total_pop >= 1000000 ~ "(5) 1000000+",
+    )
+  ) %>%
+  select(fips, pop_category)
+
+plot_usmap(regions = "counties", data = pop_map, values = "pop_category", color = "navy", size = 0.1) + 
+  scale_fill_viridis_d() + 
+  labs(
+    title = "Estimated population per county in 2019",
+    fill = "Binned Population Size"
+  ) + 
+  theme(
+    legend.position = "bottom",
+    legend.background = element_rect(fill = "lightblue1"),
+    plot.background = element_rect(fill = "lightblue1")
+  )
 ```
+
+![](20210511-Broadband_files/figure-gfm/population_choropleth-1.png)<!-- -->
+
+### Broadband Access x Population
+
+``` r
+census_pop_join <- census_pop %>%
+  rename(c(
+    "fips" = "geoid",
+    "total_pop" = "estimate"
+    ))  %>%
+  mutate(fips = as.double(fips)) %>%
+  select(fips, name, total_pop)
+
+max_pop <- max(census_pop_join$total_pop)
+
+bd_pop <- bd %>% 
+  left_join(census_pop_join) %>%
+  mutate(
+    broadband_usage = as.double(broadband_usage),
+    scale_pop = round(total_pop / max_pop, 4)
+  ) %>%
+  filter(!(is.na(scale_pop)))
+
+bd_pop_model <- lm(broadband_usage ~ scale_pop, data = bd_pop)
+bd_pop_model_rmse <- round(RMSE(bd_pop_model$residuals),2)
+mean_broadband_usage <- mean(bd_pop$broadband_usage, na.rm = TRUE)
+bd_pop_scatter_index <- round(RMSE(bd_pop_model$residuals) / mean_broadband_usage,2)
+
+bd_pop %>%
+  ggplot(aes(broadband_usage, scale_pop)) + 
+  geom_point() + 
+  geom_smooth(method = "lm") +
+  labs(
+    title = "Relationship between County Population and County Broadband Usage",
+    subtitle = glue("Good positive linear correlation with an RMSE of {bd_pop_model_rmse} and a scatter index of {bd_pop_scatter_index}"),
+    x = "Broadband Usage",
+    y = "Scaled Population\n(County Population / Max Population Size)"
+  )
+```
+
+![](20210511-Broadband_files/figure-gfm/lm_bd_pop-1.png)<!-- -->
 
 ## Average Income By County
 
-## Population x Broadband by County
+### Choropleth
 
-## Income x Broadband by County
+### Broadband Access x Income
