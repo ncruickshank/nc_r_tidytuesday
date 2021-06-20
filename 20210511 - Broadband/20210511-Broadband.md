@@ -29,7 +29,9 @@ broadband_zip <- broadband_zip %>%
 
 ``` r
 # functions
-RMSE <- function(error) {sqrt(mean(error^2))}
+RMSE <- function(error) {
+  sqrt(mean(error^2))
+  }
 ```
 
 # Introduction
@@ -138,6 +140,7 @@ data](https://data.census.gov/cedsci/).
 ``` r
 key <- as.character(read.delim("census_api_key.txt", header = FALSE)$V1)
 census_api_key(key)
+
 #v19 <- load_variables(2019, "acs5", cache = TRUE)
 ```
 

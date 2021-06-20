@@ -35,7 +35,9 @@ broadband_zip <- broadband_zip %>%
 
 ```{r}
 # functions
-RMSE <- function(error) {sqrt(mean(error^2))}
+RMSE <- function(error) {
+  sqrt(mean(error^2))
+  }
 ```
 
 # Introduction
@@ -115,6 +117,7 @@ Next I decided to briefly explore what features may help predict county broadban
 ```{r}
 key <- as.character(read.delim("census_api_key.txt", header = FALSE)$V1)
 census_api_key(key)
+
 #v19 <- load_variables(2019, "acs5", cache = TRUE)
 ```
 
