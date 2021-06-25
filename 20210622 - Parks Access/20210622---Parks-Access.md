@@ -5,7 +5,6 @@ Nick Cruickshank
 
   - [Introduction](#introduction)
       - [Noteworthy Excerpts](#noteworthy-excerpts)
-  - [Exploratory Analysis](#exploratory-analysis)
       - [Tidy Data Set](#tidy-data-set)
       - [Yearly rank of cities over
         time](#yearly-rank-of-cities-over-time)
@@ -21,7 +20,6 @@ Nick Cruickshank
         city](#distribution-of-auxillary-park-types-by-city)
       - [Relationship between spending per resident and total
         rank](#relationship-between-spending-per-resident-and-total-rank)
-  - [Primary Plotting Project](#primary-plotting-project)
 
 ``` r
 # library
@@ -38,6 +36,9 @@ parks <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidy
 ```
 
 # Introduction
+
+![Unsplash Park Stock
+Photo](images/dwayne-hills-JaXlk3fKSWk-unsplash.jpg)
 
 This weeks project uses data sourced from [The Trust for Public
 Land](https://www.tpl.org/parks-and-an-equitable-recovery-parkscore-report).
@@ -68,8 +69,6 @@ provides a good starting narrative for park access and this dataset.
 > Its assessment is grounded in the idea that Americans should have park
 > access within a 10-minute walk from their home.
 
-# Exploratory Analysis
-
 This data set explores an 8 timeframe from  to -.
 
 ## Tidy Data Set
@@ -79,7 +78,12 @@ This data set explores an 8 timeframe from  to -.
 tidy_parks <- parks %>%
   mutate(
     park_pct_city_data = as.double(str_remove(park_pct_city_data, "\\%")),
-    pct_near_park_data = as.double(str_remove(pct_near_park_data, "\\%"))
+    pct_near_park_data = as.double(str_remove(pct_near_park_data, "\\%")),
+    spend_per_resident_data = as.double(str_remove(spend_per_resident_data, "\\$")),
+    basketball_data = 10 * basketball_data, # per 100,000 residents
+    playground_data = 10 * playground_data, # per 100,000 residents
+    rec_sr_data = 5 * rec_sr_data, # per 100,000 residents
+    restroom_data = 10 * restroom_data, # per 100,000 residents
     )
 
 city_avg_points <- parks %>%
@@ -143,8 +147,6 @@ parks %>%
 ![](20210622---Parks-Access_files/figure-gfm/avg_total_rank_over_time-1.png)<!-- -->
 
 ## Which cities have the largest parks?
-
-Median park size
 
 ``` r
 top_20_parks_med_size <- parks %>%
@@ -258,15 +260,45 @@ tidy_parks %>%
 
 ![](20210622---Parks-Access_files/figure-gfm/park_access_by_city_park_area-1.png)<!-- -->
 
-The 45%+ `Parkland % City Area` might be outliers, and should be
-filtered out for this graph.
-
 ## Distribution of auxillary park types by city
 
 Pivot `basketball_data`, `dogpark_data`, `playground_data`,
 `rec_sr_data`, and `splashground_data`. First you’ll need to standardize
 the per capita metrics.
 
+``` r
+tidy_parks %>%
+  pivot_longer(cols = c(basketball_data, dogpark_data, playground_data, rec_sr_data, restroom_data, splashground_data), values_to = "points", names_to = "metric") %>%
+  filter(city %in% top_10_cities$city) %>%
+  ggplot(aes(year, points)) + 
+  geom_line(aes(color = metric), size = 1.2) +
+  geom_point(aes(color = metric), size = 1.5) +
+  facet_wrap(~ city, ncol = 5) +
+  theme_bw() + 
+  theme(
+    legend.position = "bottom"
+  )
+```
+
+![](20210622---Parks-Access_files/figure-gfm/points_over_time_by_metric-1.png)<!-- -->
+
+This is all well and good, but what cities have seen the greatest surge
+in `total_points` from 2012 to 2020?
+
 ## Relationship between spending per resident and total rank
 
-# Primary Plotting Project
+``` r
+tidy_parks %>%
+  ggplot(aes(spend_per_resident_data, total_pct)) + 
+  geom_point() + 
+  geom_smooth() + 
+  labs(
+    title = "Strong positive correlation between spending per resident and total park points",
+    subtitle = "There appears to be diminishing returns after $200 / resident",
+    x = "Spending / Resident (USD)",
+    y = "Total Points as a Percentage"
+  ) + 
+  theme_classic()
+```
+
+![](20210622---Parks-Access_files/figure-gfm/spending_by_total_points-1.png)<!-- -->
