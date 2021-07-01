@@ -1,0 +1,71 @@
+---
+title: "20210629 - Rescue Animals"
+author: "Nick Cruickshank"
+date: "6/30/2021"
+output: 
+  github_document:
+    toc: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning=FALSE)
+```
+
+```{r}
+# libraries
+library(forcats)
+library(lubridate)
+library(readr)
+library(tidyverse)
+```
+
+```{r}
+# data
+animal_rescues <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-06-29/animal_rescues.csv')
+```
+
+# Introduction
+
+Data this week comes from [London.gov](https://data.london.gov.uk/dataset/animal-rescue-incidents-attended-by-lfb). 
+
+> Fox in bedroom, dog trapped in wall. The London Fire Brigade responds to hundreds of requests to rescue animals each year. Its monthly-updated spreadsheet of such events goes back to 2009; it lists the location and type of property, the kind of animal and rescue, hours spent, a (very) brief description, and more. [h/t Soph Warnes]
+
+Another [article](https://www.theguardian.com/world/2021/jan/08/animal-rescues-london-fire-brigade-rise-2020-pandemic-year) found that animals rescues increased by 20% in the year of the pandemic (2020). 
+
+> The London fire brigade (LFB) was involved in 755 such incidents – more than two a day. The number of rescues rose by 20% compared with 2019 when there were 602, with the biggest rise coming in the number of non-domestic animals rescued, according to the data.
+
+```{r}
+# tidy
+animal_rescues
+
+unredacted <- animal_rescues %>%
+  filter(final_description != "Redacted")
+```
+
+# Exploratory Data Analysis
+
+## Notes
+
+```{r}
+hist(animal_rescues$cal_year)
+```
+
+`type_of_incident`: Only 'Special Service' represented.
+
+`pump` = truck / unit deployed.
+
+```{r fig.height=4, fig.width=10}
+animal_rescues %>%
+  count(originof_call) %>%
+  ggplot(aes(fct_reorder(originof_call, -n), n)) + 
+  geom_bar(stat = "identity")
+```
+
+
+# Data Visualization Projects
+
+## Choropleth of animal rescues
+
+## Timeline of animal rescue
+
+By species?
