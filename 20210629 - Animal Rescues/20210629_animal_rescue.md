@@ -9,10 +9,21 @@ Nick Cruickshank
   - [Data Visualization Projects](#data-visualization-projects)
       - [Choropleth of animal rescues](#choropleth-of-animal-rescues)
       - [Timeline of animal rescue](#timeline-of-animal-rescue)
+          - [What does an average year look like for animal
+            rescue?](#what-does-an-average-year-look-like-for-animal-rescue)
+          - [What are the busiest times of
+            day?](#what-are-the-busiest-times-of-day)
+      - [Where do animals get rescued from the
+        most?](#where-do-animals-get-rescued-from-the-most)
+      - [What animals cost the most to
+        rescue?](#what-animals-cost-the-most-to-rescue)
+      - [What kind of properties do animals most routinely get trapped
+        in?](#what-kind-of-properties-do-animals-most-routinely-get-trapped-in)
 
 ``` r
 # libraries
 library(forcats)
+library(glue)
 library(lubridate)
 library(readr)
 library(tidyverse)
@@ -46,36 +57,53 @@ found that animals rescues increased by 20% in the year of the pandemic
 
 ``` r
 # tidy
-animal_rescues
+## prominent species
+top_species <- animal_rescues %>%
+  mutate(animal_group_parent = str_to_lower(animal_group_parent)) %>%
+  filter(!(str_detect(animal_group_parent, "unknown"))) %>%
+  count(animal_group_parent) %>%
+  arrange(desc(n)) %>%
+  head(6) # very steep drop off after 6 species
+
+top_species_list <- top_species$animal_group_parent
+top3_species_list <- head(top_species, 3)$animal_group_parent
+
+## final tidy
+ar <- animal_rescues %>%
+  filter(
+    cal_year != 2021 # this year isn't complete, and therefore might throw off visualization
+  ) %>%
+  mutate(
+    animal_group_parent = str_to_lower(animal_group_parent),
+    # time
+    date_time_of_call = as.POSIXct(date_time_of_call, format = "%d/%m/%Y %H:%M"),
+    date = as.Date(date_time_of_call, format = "%d/%m/%Y"),
+    floor_year_month = floor_date(date, "months"),
+    time = hour(date_time_of_call),
+    month_day = strftime(date_time_of_call, "%m-%d"),
+    month = strftime(date_time_of_call, format = "%m\n%b"),
+    day = day(date_time_of_call),
+    # special service categories
+    special_service_type_category = str_to_lower(special_service_type_category),
+    service_category = str_remove(special_service_type_category, "animal rescue from")
+  )
+
+unredacted <- ar %>%
+  filter(final_description != "Redacted")
 ```
 
-    ## # A tibble: 7,544 x 31
-    ##    incident_number date_time_of_ca~ cal_year fin_year type_of_incident
-    ##              <dbl> <chr>               <dbl> <chr>    <chr>           
-    ##  1          139091 01/01/2009 03:01     2009 2008/09  Special Service 
-    ##  2          275091 01/01/2009 08:51     2009 2008/09  Special Service 
-    ##  3         2075091 04/01/2009 10:07     2009 2008/09  Special Service 
-    ##  4         2872091 05/01/2009 12:27     2009 2008/09  Special Service 
-    ##  5         3553091 06/01/2009 15:23     2009 2008/09  Special Service 
-    ##  6         3742091 06/01/2009 19:30     2009 2008/09  Special Service 
-    ##  7         4011091 07/01/2009 06:29     2009 2008/09  Special Service 
-    ##  8         4211091 07/01/2009 11:55     2009 2008/09  Special Service 
-    ##  9         4306091 07/01/2009 13:48     2009 2008/09  Special Service 
-    ## 10         4715091 07/01/2009 21:24     2009 2008/09  Special Service 
-    ## # ... with 7,534 more rows, and 26 more variables: pump_count <chr>,
-    ## #   pump_hours_total <chr>, hourly_notional_cost <dbl>,
-    ## #   incident_notional_cost <chr>, final_description <chr>,
-    ## #   animal_group_parent <chr>, originof_call <chr>, property_type <chr>,
-    ## #   property_category <chr>, special_service_type_category <chr>,
-    ## #   special_service_type <chr>, ward_code <chr>, ward <chr>,
-    ## #   borough_code <chr>, borough <chr>, stn_ground_name <chr>, uprn <chr>,
-    ## #   street <chr>, usrn <chr>, postcode_district <chr>, easting_m <chr>,
-    ## #   northing_m <chr>, easting_rounded <dbl>, northing_rounded <dbl>,
-    ## #   latitude <chr>, longitude <chr>
+``` r
+# values
+min_date <- strftime(min(ar$date), format = "%d-%b-%Y")
+max_date <- strftime(max(ar$date), format = "%d-%b-%Y")
+```
 
 ``` r
-unredacted <- animal_rescues %>%
-  filter(final_description != "Redacted")
+# functions
+Mode <- function(x) {
+  ux <- unique(x)
+  ux[which.max(tabulate(match(x, ux)))]
+}
 ```
 
 # Exploratory Data Analysis
@@ -83,23 +111,48 @@ unredacted <- animal_rescues %>%
 ## Notes
 
 ``` r
-hist(animal_rescues$cal_year)
+count(ar, cal_year)
 ```
 
-![](20210629_animal_rescue_files/figure-gfm/unnamed-chunk-4-1.png)<!-- -->
+    ## # A tibble: 12 x 2
+    ##    cal_year     n
+    ##       <dbl> <int>
+    ##  1     2009   568
+    ##  2     2010   611
+    ##  3     2011   620
+    ##  4     2012   603
+    ##  5     2013   585
+    ##  6     2014   583
+    ##  7     2015   540
+    ##  8     2016   604
+    ##  9     2017   539
+    ## 10     2018   610
+    ## 11     2019   604
+    ## 12     2020   758
 
 `type_of_incident`: Only ‘Special Service’ represented.
 
 `pump` = truck / unit deployed.
 
 ``` r
-animal_rescues %>%
-  count(originof_call) %>%
-  ggplot(aes(fct_reorder(originof_call, -n), n)) + 
-  geom_bar(stat = "identity")
+count(ar, originof_call) %>%
+  arrange(desc(n))
 ```
 
-![](20210629_animal_rescue_files/figure-gfm/unnamed-chunk-5-1.png)<!-- -->
+    ## # A tibble: 8 x 2
+    ##   originof_call             n
+    ##   <chr>                 <int>
+    ## 1 Person (mobile)        4005
+    ## 2 Person (land line)     3032
+    ## 3 Police                  131
+    ## 4 Other FRS                49
+    ## 5 Ambulance                 2
+    ## 6 Coastguard                2
+    ## 7 Not known                 2
+    ## 8 Person (running call)     2
+
+I don’t think there is much insight to be gleaned from whether the call
+was made from a landline or mobile device.
 
 # Data Visualization Projects
 
@@ -108,3 +161,95 @@ animal_rescues %>%
 ## Timeline of animal rescue
 
 By species?
+
+``` r
+ar %>%
+  filter(animal_group_parent %in% top3_species_list) %>%
+  mutate(animal_group_parent = str_to_title(animal_group_parent)) %>%
+  count(floor_year_month, animal_group_parent) %>%
+  ggplot(aes(floor_year_month, n)) + 
+  geom_line() + 
+  facet_wrap(~ animal_group_parent, ncol = 1) + 
+  labs(
+    title = "Number of animal rescues per month",
+    subtitle = "High seasonality observed for birds and cats, not for dogs",
+    x = "Date",
+    y = "Monthly Rescues"
+  )
+```
+
+![](20210629_animal_rescue_files/figure-gfm/overall_rescue_timeline-1.png)<!-- -->
+
+### What does an average year look like for animal rescue?
+
+``` r
+ar_monthly_species_mode <- ar %>%
+  filter(
+    animal_group_parent %in% top3_species_list,
+    service_category != "other animal assistance"
+  ) %>%
+  group_by(month, animal_group_parent) %>%
+  dplyr::summarise(mode_service = Mode(service_category))
+
+ar_monthly_species_mode %>%
+  filter(animal_group_parent == "dog")
+```
+
+    ## # A tibble: 12 x 3
+    ## # Groups:   month [12]
+    ##    month     animal_group_parent mode_service   
+    ##    <chr>     <chr>               <chr>          
+    ##  1 "01\nJan" dog                 " water"       
+    ##  2 "02\nFeb" dog                 " water"       
+    ##  3 "03\nMar" dog                 " below ground"
+    ##  4 "04\nApr" dog                 " below ground"
+    ##  5 "05\nMay" dog                 " height"      
+    ##  6 "06\nJun" dog                 " height"      
+    ##  7 "07\nJul" dog                 " height"      
+    ##  8 "08\nAug" dog                 " height"      
+    ##  9 "09\nSep" dog                 " below ground"
+    ## 10 "10\nOct" dog                 " below ground"
+    ## 11 "11\nNov" dog                 " water"       
+    ## 12 "12\nDec" dog                 " water"
+
+``` r
+ar %>%
+  mutate(
+    month = strftime(date_time_of_call, format = "%m\n%b"),
+    day = day(date_time_of_call)
+    ) %>%
+  filter(animal_group_parent == "dog") %>%
+  # group_by(cal_year, month, day, animal_group_parent) %>%
+  # dplyr::summarise(n = n()) %>%
+  # group_by(month, day, animal_group_parent) %>%
+  # mutate(avg = mean(n)) %>%
+  # ungroup() %>%
+  count(month, day, animal_group_parent) %>%
+  left_join(ar_monthly_species_mode) %>%
+  ggplot(aes(day, n)) +
+  geom_line() +
+  geom_area(aes(fill = mode_service)) +
+  facet_wrap(~ month, ncol = 12) + 
+  labs(
+    title = glue("Count of dog rescues each day of an average calendar year (from {min_date} to {max_date})"),
+    subtitle = "Number of rescues on each day plotted. Would average be betterto plot on y-axis?",
+    caption = "This graph needs to be repeated for each of the other top three species, and then each plot should be stacked."
+  ) + 
+  theme_minimal() + 
+  theme(
+    axis.text.x = element_blank(),
+    legend.position = "bottom"
+  )
+```
+
+![](20210629_animal_rescue_files/figure-gfm/Rescues%20by%20Species%20and%20Service%20Type%20in%20an%20Average%20Year-1.png)<!-- -->
+
+### What are the busiest times of day?
+
+## Where do animals get rescued from the most?
+
+## What animals cost the most to rescue?
+
+Normalize by hours spent?
+
+## What kind of properties do animals most routinely get trapped in?

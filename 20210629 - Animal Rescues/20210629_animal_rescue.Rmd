@@ -14,6 +14,7 @@ knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning=FALSE)
 ```{r}
 # libraries
 library(forcats)
+library(glue)
 library(lubridate)
 library(readr)
 library(tidyverse)
@@ -36,31 +37,76 @@ Another [article](https://www.theguardian.com/world/2021/jan/08/animal-rescues-l
 
 ```{r}
 # tidy
-animal_rescues
+## prominent species
+top_species <- animal_rescues %>%
+  mutate(animal_group_parent = str_to_lower(animal_group_parent)) %>%
+  filter(!(str_detect(animal_group_parent, "unknown"))) %>%
+  count(animal_group_parent) %>%
+  arrange(desc(n)) %>%
+  head(6) # very steep drop off after 6 species
 
-unredacted <- animal_rescues %>%
+top_species_list <- top_species$animal_group_parent
+top3_species_list <- head(top_species, 3)$animal_group_parent
+
+## final tidy
+ar <- animal_rescues %>%
+  filter(
+    cal_year != 2021 # this year isn't complete, and therefore might throw off visualization
+  ) %>%
+  mutate(
+    animal_group_parent = str_to_lower(animal_group_parent),
+    # time
+    date_time_of_call = as.POSIXct(date_time_of_call, format = "%d/%m/%Y %H:%M"),
+    date = as.Date(date_time_of_call, format = "%d/%m/%Y"),
+    floor_year_month = floor_date(date, "months"),
+    time = hour(date_time_of_call),
+    month_day = strftime(date_time_of_call, "%m-%d"),
+    month = strftime(date_time_of_call, format = "%m\n%b"),
+    day = day(date_time_of_call),
+    # special service categories
+    special_service_type_category = str_to_lower(special_service_type_category),
+    service_category = str_remove(special_service_type_category, "animal rescue from")
+  )
+
+unredacted <- ar %>%
   filter(final_description != "Redacted")
 ```
+
+```{r}
+# values
+min_date <- strftime(min(ar$date), format = "%d-%b-%Y")
+max_date <- strftime(max(ar$date), format = "%d-%b-%Y")
+```
+
+
+```{r}
+# functions
+Mode <- function(x) {
+  ux <- unique(x)
+  ux[which.max(tabulate(match(x, ux)))]
+}
+```
+
 
 # Exploratory Data Analysis
 
 ## Notes
 
 ```{r}
-hist(animal_rescues$cal_year)
+count(ar, cal_year)
 ```
+
 
 `type_of_incident`: Only 'Special Service' represented.
 
 `pump` = truck / unit deployed.
 
-```{r fig.height=4, fig.width=10}
-animal_rescues %>%
-  count(originof_call) %>%
-  ggplot(aes(fct_reorder(originof_call, -n), n)) + 
-  geom_bar(stat = "identity")
+```{r eda_call_origin, fig.height=4, fig.width=10}
+count(ar, originof_call) %>%
+  arrange(desc(n))
 ```
 
+I don't think there is much insight to be gleaned from whether the call was made from a landline or mobile device.
 
 # Data Visualization Projects
 
@@ -69,3 +115,74 @@ animal_rescues %>%
 ## Timeline of animal rescue
 
 By species?
+
+```{r overall_rescue_timeline, fig.height=8, fig.width=8}
+ar %>%
+  filter(animal_group_parent %in% top3_species_list) %>%
+  mutate(animal_group_parent = str_to_title(animal_group_parent)) %>%
+  count(floor_year_month, animal_group_parent) %>%
+  ggplot(aes(floor_year_month, n)) + 
+  geom_line() + 
+  facet_wrap(~ animal_group_parent, ncol = 1) + 
+  labs(
+    title = "Number of animal rescues per month",
+    subtitle = "High seasonality observed for birds and cats, not for dogs",
+    x = "Date",
+    y = "Monthly Rescues"
+  )
+  
+```
+
+### What does an average year look like for animal rescue?
+
+```{r Rescues by Species and Service Type in an Average Year, fig.height=5, fig.width=10}
+ar_monthly_species_mode <- ar %>%
+  filter(
+    animal_group_parent %in% top3_species_list,
+    service_category != "other animal assistance"
+  ) %>%
+  group_by(month, animal_group_parent) %>%
+  dplyr::summarise(mode_service = Mode(service_category))
+
+ar_monthly_species_mode %>%
+  filter(animal_group_parent == "dog")
+
+ar %>%
+  mutate(
+    month = strftime(date_time_of_call, format = "%m\n%b"),
+    day = day(date_time_of_call)
+    ) %>%
+  filter(animal_group_parent == "dog") %>%
+  # group_by(cal_year, month, day, animal_group_parent) %>%
+  # dplyr::summarise(n = n()) %>%
+  # group_by(month, day, animal_group_parent) %>%
+  # mutate(avg = mean(n)) %>%
+  # ungroup() %>%
+  count(month, day, animal_group_parent) %>%
+  left_join(ar_monthly_species_mode) %>%
+  ggplot(aes(day, n)) +
+  geom_line() +
+  geom_area(aes(fill = mode_service)) +
+  facet_wrap(~ month, ncol = 12) + 
+  labs(
+    title = glue("Count of dog rescues each day of an average calendar year (from {min_date} to {max_date})"),
+    subtitle = "Number of rescues on each day plotted. Would average be betterto plot on y-axis?",
+    caption = "This graph needs to be repeated for each of the other top three species, and then each plot should be stacked."
+  ) + 
+  theme_minimal() + 
+  theme(
+    axis.text.x = element_blank(),
+    legend.position = "bottom"
+  )
+```
+
+
+### What are the busiest times of day?
+
+## Where do animals get rescued from the most?
+
+## What animals cost the most to rescue?
+
+Normalize by hours spent?
+
+## What kind of properties do animals most routinely get trapped in?
