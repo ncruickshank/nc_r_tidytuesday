@@ -9,10 +9,14 @@ Nick Cruickshank
   - [Data Visualization Projects](#data-visualization-projects)
       - [Choropleth of animal rescues](#choropleth-of-animal-rescues)
       - [Timeline of animal rescue](#timeline-of-animal-rescue)
-          - [What does an average year look like for animal
-            rescue?](#what-does-an-average-year-look-like-for-animal-rescue)
-          - [What are the busiest times of
-            day?](#what-are-the-busiest-times-of-day)
+          - [Average Year of Animal
+            Rescues](#average-year-of-animal-rescues)
+          - [Average Day of Animal
+            Rescues](#average-day-of-animal-rescues)
+          - [Paste Years and Hours
+            Together](#paste-years-and-hours-together)
+      - [What propery types do most rescues occur
+        at?](#what-propery-types-do-most-rescues-occur-at)
       - [Where do animals get rescued from the
         most?](#where-do-animals-get-rescued-from-the-most)
       - [What animals cost the most to
@@ -22,9 +26,11 @@ Nick Cruickshank
 
 ``` r
 # libraries
+library(cowplot)
 library(forcats)
 library(glue)
 library(lubridate)
+library(patchwork)
 library(readr)
 library(tidyverse)
 ```
@@ -75,17 +81,20 @@ ar <- animal_rescues %>%
   ) %>%
   mutate(
     animal_group_parent = str_to_lower(animal_group_parent),
+    
     # time
     date_time_of_call = as.POSIXct(date_time_of_call, format = "%d/%m/%Y %H:%M"),
     date = as.Date(date_time_of_call, format = "%d/%m/%Y"),
     floor_year_month = floor_date(date, "months"),
-    time = hour(date_time_of_call),
+    hour_of_day = hour(date_time_of_call),
     month_day = strftime(date_time_of_call, "%m-%d"),
-    month = strftime(date_time_of_call, format = "%m\n%b"),
+    month = strftime(date_time_of_call, format = "%b"),
+    week = week(date_time_of_call),
     day = day(date_time_of_call),
+    
     # special service categories
     special_service_type_category = str_to_lower(special_service_type_category),
-    service_category = str_remove(special_service_type_category, "animal rescue from")
+    service_category = str_to_title(str_remove(special_service_type_category, "animal rescue from "))
   )
 
 unredacted <- ar %>%
@@ -94,8 +103,8 @@ unredacted <- ar %>%
 
 ``` r
 # values
-min_date <- strftime(min(ar$date), format = "%d-%b-%Y")
-max_date <- strftime(max(ar$date), format = "%d-%b-%Y")
+min_date <- strftime(min(ar$date), format = "%b %d, %Y")
+max_date <- strftime(max(ar$date), format = "%b %d, %Y")
 ```
 
 ``` r
@@ -160,8 +169,6 @@ was made from a landline or mobile device.
 
 ## Timeline of animal rescue
 
-By species?
-
 ``` r
 ar %>%
   filter(animal_group_parent %in% top3_species_list) %>%
@@ -180,13 +187,13 @@ ar %>%
 
 ![](20210629_animal_rescue_files/figure-gfm/overall_rescue_timeline-1.png)<!-- -->
 
-### What does an average year look like for animal rescue?
+### Average Year of Animal Rescues
 
 ``` r
 ar_monthly_species_mode <- ar %>%
   filter(
     animal_group_parent %in% top3_species_list,
-    service_category != "other animal assistance"
+    service_category != "Other Animal Assistance"
   ) %>%
   group_by(month, animal_group_parent) %>%
   dplyr::summarise(mode_service = Mode(service_category))
@@ -197,54 +204,230 @@ ar_monthly_species_mode %>%
 
     ## # A tibble: 12 x 3
     ## # Groups:   month [12]
-    ##    month     animal_group_parent mode_service   
-    ##    <chr>     <chr>               <chr>          
-    ##  1 "01\nJan" dog                 " water"       
-    ##  2 "02\nFeb" dog                 " water"       
-    ##  3 "03\nMar" dog                 " below ground"
-    ##  4 "04\nApr" dog                 " below ground"
-    ##  5 "05\nMay" dog                 " height"      
-    ##  6 "06\nJun" dog                 " height"      
-    ##  7 "07\nJul" dog                 " height"      
-    ##  8 "08\nAug" dog                 " height"      
-    ##  9 "09\nSep" dog                 " below ground"
-    ## 10 "10\nOct" dog                 " below ground"
-    ## 11 "11\nNov" dog                 " water"       
-    ## 12 "12\nDec" dog                 " water"
+    ##    month animal_group_parent mode_service
+    ##    <chr> <chr>               <chr>       
+    ##  1 Apr   dog                 Below Ground
+    ##  2 Aug   dog                 Height      
+    ##  3 Dec   dog                 Water       
+    ##  4 Feb   dog                 Water       
+    ##  5 Jan   dog                 Water       
+    ##  6 Jul   dog                 Height      
+    ##  7 Jun   dog                 Height      
+    ##  8 Mar   dog                 Below Ground
+    ##  9 May   dog                 Height      
+    ## 10 Nov   dog                 Water       
+    ## 11 Oct   dog                 Below Ground
+    ## 12 Sep   dog                 Below Ground
 
 ``` r
-ar %>%
-  mutate(
-    month = strftime(date_time_of_call, format = "%m\n%b"),
-    day = day(date_time_of_call)
+month_levels <- c("Jan", "Feb", "Mar", "Apr",
+                  "May", "Jun", "Jul", "Aug",
+                  "Sep", "Oct", "Nov", "Dec")
+
+df_duration <- round(as.numeric(difftime(max(ar$date_time_of_call), 
+                                         min(ar$date_time_of_call), 
+                                         unit = "weeks")) / 52.25)
+
+plot_animal_rescue_year_by_species <- function(df = ar, species) {
+  plot_title = paste0(str_to_title(species), "s")
+  
+  plot <- df %>%
+    filter(animal_group_parent == species) %>%
+    group_by(cal_year, month, week, animal_group_parent) %>%
+    dplyr::summarise(n = n()) %>%
+    group_by(month, week, animal_group_parent) %>%
+    dplyr::summarise(
+      avg = mean(n),
+      sd = sd(n),
+      min = min(n),
+      max = max(n)
     ) %>%
-  filter(animal_group_parent == "dog") %>%
-  # group_by(cal_year, month, day, animal_group_parent) %>%
-  # dplyr::summarise(n = n()) %>%
-  # group_by(month, day, animal_group_parent) %>%
-  # mutate(avg = mean(n)) %>%
-  # ungroup() %>%
-  count(month, day, animal_group_parent) %>%
-  left_join(ar_monthly_species_mode) %>%
-  ggplot(aes(day, n)) +
-  geom_line() +
-  geom_area(aes(fill = mode_service)) +
-  facet_wrap(~ month, ncol = 12) + 
-  labs(
-    title = glue("Count of dog rescues each day of an average calendar year (from {min_date} to {max_date})"),
-    subtitle = "Number of rescues on each day plotted. Would average be betterto plot on y-axis?",
-    caption = "This graph needs to be repeated for each of the other top three species, and then each plot should be stacked."
-  ) + 
-  theme_minimal() + 
+    left_join(ar_monthly_species_mode) %>%
+    ggplot(aes(week, avg)) +
+    geom_line(aes(color = mode_service), size = 1.5) +
+    geom_point(aes(color = mode_service), size = 3) + 
+    geom_area(aes(fill = mode_service), alpha = 0.75) +
+    scale_color_manual(values = c(
+      "Below Ground"= "burlywood3",
+      "Height" = "lightskyblue1",
+      "Water" = "royalblue"
+    ), drop = FALSE) +
+    scale_fill_manual(values = c(
+      "Below Ground"= "burlywood3",
+      "Height" = "lightskyblue1",
+      "Water" = "royalblue"
+    )) +
+    facet_wrap(~ factor(month, levels = month_levels), ncol = 12, scales = "free_x") + 
+    labs(
+      title = plot_title,
+      x = "",
+      y = "Rescues",
+      fill = "Rescued From (Mode)",
+      color = "Rescued From (Mode)"
+    ) + 
+    theme_dark() + 
+    theme(
+      plot.background = element_rect(fill = "gray50", color = "gray50"),
+      panel.grid.major.x = element_blank(),
+      panel.grid.minor.x = element_blank(),
+      axis.ticks.x = element_blank(),
+      panel.grid.minor.y = element_blank(),
+      axis.text.x = element_blank(),
+      legend.position = ifelse(species == "dog", "bottom", "none"),
+      #legend.position = "bottom",
+      legend.background = element_rect(fill = "grey50"),
+      plot.title = element_text(hjust = 0.5, size = 14)
+    )
+  
+  plot
+}
+
+## PATCHWORK Legend Position "Bottom" is bugged
+# plot_animal_rescue_year_by_species(ar, "cat") + 
+#   plot_animal_rescue_year_by_species(ar, "bird") + 
+#   plot_animal_rescue_year_by_species(ar, "dog") +
+#   plot_annotation(
+#     title = glue("Average Weekly Animal Rescues in London over the past {df_duration} years"),
+#     theme = theme(
+#       plot.background = element_rect(fill = "grey50"),
+#       plot.title = element_text(size = 18)
+#     )
+#   ) +
+#   plot_layout(
+#     ncol = 1,
+#     guides = "collect"
+#   ) &  theme(legend.direction = "vertical")
+```
+
+``` r
+cat_year <- plot_animal_rescue_year_by_species(ar, "cat")
+bird_year <- plot_animal_rescue_year_by_species(ar, "bird")
+dog_year <- plot_animal_rescue_year_by_species(ar, "dog")
+
+year_plots <- plot_grid(cat_year, bird_year, dog_year,
+                        ncol = 1)
+years_title <- ggdraw() + 
+  draw_label("Average Weekly Rescues", size = 20, fontface = "bold") + 
   theme(
-    axis.text.x = element_blank(),
-    legend.position = "bottom"
+    plot.margin = margin(0,0,0,7),
+    plot.background = element_rect(fill = "grey50", color = "grey50")
   )
+
+year_grid <- plot_grid(years_title, year_plots, ncol = 1, rel_heights = c(0.1,1))
+
+year_grid
 ```
 
 ![](20210629_animal_rescue_files/figure-gfm/Rescues%20by%20Species%20and%20Service%20Type%20in%20an%20Average%20Year-1.png)<!-- -->
 
-### What are the busiest times of day?
+### Average Day of Animal Rescues
+
+``` r
+ar_hourly_species_mode <- ar %>%
+  filter(
+    animal_group_parent %in% top3_species_list,
+    service_category != "Other Animal Assistance"
+  ) %>%
+  group_by(hour_of_day, animal_group_parent) %>%
+  dplyr::summarise(mode_service = Mode(service_category))
+
+plot_animal_rescues_hourly_by_species <- function(df = ar, species) {
+  df %>%
+    filter(animal_group_parent == species) %>%
+    count(animal_group_parent, cal_year, hour_of_day) %>%
+    group_by(animal_group_parent, hour_of_day) %>%
+    dplyr::summarise(avg = mean(n)) %>%
+    left_join(ar_hourly_species_mode) %>%
+    replace_na(list(mode_service = "Other")) %>%
+    #mutate(species = paste0(str_to_title(animal_group_parent)), "s") %>%
+    ggplot(aes(hour_of_day, avg)) + 
+    geom_bar(aes(fill = mode_service, color = mode_service), alpha = 0.75, stat = "identity", size = 1.5) + 
+    scale_fill_manual(values = c(
+      "Below Ground"= "burlywood3",
+      "Height" = "lightskyblue1",
+      "Water" = "royalblue",
+      "Other" = "gray10"
+    )) + 
+    scale_color_manual(values = c(
+      "Below Ground"= "burlywood3",
+      "Height" = "lightskyblue1",
+      "Water" = "royalblue",
+      "Other" = "gray10"
+    )) + 
+    labs(
+      title = paste0(str_to_title(species), "s"),
+      x = "",
+      y = "",
+      fill = "Rescued From (Mode)",
+      color = "Rescued From (Mode)"
+    ) +
+    facet_wrap(~ hour_of_day, scales = "free_x", ncol = 24) + 
+    theme_dark() + 
+    theme(
+      legend.position = ifelse(species == "dog", "bottom", "none"),
+      #legend.position =  "bottom",
+      legend.background = element_rect(fill = "grey50"),
+      plot.background = element_rect(fill = "grey50", color = "grey50"),
+      panel.grid.minor.x = element_blank(),
+      panel.grid.major.x = element_blank(),
+      panel.grid.minor.y = element_blank(),
+      axis.ticks.x = element_blank(),
+      axis.text.x = element_blank(),
+      plot.title = element_text(hjust = 0.5, size = 14)
+    )
+}
+```
+
+``` r
+cat_hours <- plot_animal_rescues_hourly_by_species(ar, "cat")
+bird_hours <- plot_animal_rescues_hourly_by_species(ar, "bird")
+dog_hours <- plot_animal_rescues_hourly_by_species(ar, "dog")
+
+hour_plots <- plot_grid(cat_hours, bird_hours, dog_hours, ncol = 1)
+
+hours_title <- ggdraw() + 
+  draw_label("Average Hourly Rescues", fontface = "bold", size = 20) + 
+  theme(
+    plot.margin = margin(0,0,0,0),
+    plot.background = element_rect(fill = "grey50", color = "grey50")
+  )
+
+hour_grid <- plot_grid(hours_title, hour_plots, ncol = 1, rel_heights = c(0.1, 1))
+
+hour_grid
+```
+
+![](20210629_animal_rescue_files/figure-gfm/Rescues%20by%20Species%20and%20Service%20Type%20in%20an%20Average%20Day-1.png)<!-- -->
+
+### Paste Years and Hours Together
+
+``` r
+plot_grid(year_grid, hour_grid)
+```
+
+![](20210629_animal_rescue_files/figure-gfm/London%20Animal%20Rescues-1.png)<!-- -->
+
+## What propery types do most rescues occur at?
+
+``` r
+count(ar, property_type) %>%
+  arrange(desc(n))
+```
+
+    ## # A tibble: 179 x 2
+    ##    property_type                                         n
+    ##    <chr>                                             <int>
+    ##  1 House - single occupancy                           1867
+    ##  2 Purpose Built Flats/Maisonettes - Up to 3 storeys   599
+    ##  3 Purpose Built Flats/Maisonettes - 4 to 9 storeys    587
+    ##  4 Tree scrub                                          321
+    ##  5 Animal harm outdoors                                280
+    ##  6 Converted Flat/Maisonettes - 3 or more storeys      254
+    ##  7 Car                                                 241
+    ##  8 Domestic garden (vegetation not equipment)          221
+    ##  9 Converted Flat/Maisonette - Up to 2 storeys         207
+    ## 10 Park                                                180
+    ## # ... with 169 more rows
 
 ## Where do animals get rescued from the most?
 

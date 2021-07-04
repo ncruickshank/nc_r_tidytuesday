@@ -13,6 +13,7 @@ knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning=FALSE)
 
 ```{r}
 # libraries
+library(cowplot)
 library(forcats)
 library(glue)
 library(lubridate)
@@ -118,9 +119,7 @@ I don't think there is much insight to be gleaned from whether the call was made
 
 ## Timeline of animal rescue
 
-By species?
-
-```{r overall_rescue_timeline, fig.height=8, fig.width=8}
+```{r overall_rescue_timeline, fig.height=5, fig.width=8}
 ar %>%
   filter(animal_group_parent %in% top3_species_list) %>%
   mutate(animal_group_parent = str_to_title(animal_group_parent)) %>%
@@ -134,12 +133,11 @@ ar %>%
     x = "Date",
     y = "Monthly Rescues"
   )
-  
 ```
 
-### What does an average year look like for animal rescue?
+### Average Year of Animal Rescues
 
-```{r Rescues by Species and Service Type in an Average Year, fig.height=7, fig.width=8}
+```{r set up plot functions and data}
 ar_monthly_species_mode <- ar %>%
   filter(
     animal_group_parent %in% top3_species_list,
@@ -177,7 +175,7 @@ plot_animal_rescue_year_by_species <- function(df = ar, species) {
     ggplot(aes(week, avg)) +
     geom_line(aes(color = mode_service), size = 1.5) +
     geom_point(aes(color = mode_service), size = 3) + 
-    geom_area(aes(fill = mode_service), alpha = 0.65) +
+    geom_area(aes(fill = mode_service), alpha = 0.75) +
     scale_color_manual(values = c(
       "Below Ground"= "burlywood3",
       "Height" = "lightskyblue1",
@@ -192,13 +190,13 @@ plot_animal_rescue_year_by_species <- function(df = ar, species) {
     labs(
       title = plot_title,
       x = "",
-      y = "Avg. Weekly Rescues",
-      fill = "Rescued From",
-      color = "Rescued From"
+      y = "Rescues",
+      fill = "Rescued From (Mode)",
+      color = "Rescued From (Mode)"
     ) + 
     theme_dark() + 
     theme(
-      plot.background = element_rect(fill = "gray50"),
+      plot.background = element_rect(fill = "gray50", color = "gray50"),
       panel.grid.major.x = element_blank(),
       panel.grid.minor.x = element_blank(),
       axis.ticks.x = element_blank(),
@@ -213,25 +211,46 @@ plot_animal_rescue_year_by_species <- function(df = ar, species) {
   plot
 }
 
-plot_animal_rescue_year_by_species(ar, "cat") + 
-  plot_animal_rescue_year_by_species(ar, "bird") + 
-  plot_animal_rescue_year_by_species(ar, "dog") +
-  plot_annotation(
-    title = glue("Average Weekly Animal Rescues in London over the past {df_duration} years"),
-    theme = theme(
-      plot.background = element_rect(fill = "grey50"),
-      plot.title = element_text(size = 18)
-    )
-  ) +
-  plot_layout(
-    ncol = 1,
-    guides = "collect"
-  ) &  theme(legend.direction = "vertical")
+## PATCHWORK Legend Position "Bottom" is bugged
+# plot_animal_rescue_year_by_species(ar, "cat") + 
+#   plot_animal_rescue_year_by_species(ar, "bird") + 
+#   plot_animal_rescue_year_by_species(ar, "dog") +
+#   plot_annotation(
+#     title = glue("Average Weekly Animal Rescues in London over the past {df_duration} years"),
+#     theme = theme(
+#       plot.background = element_rect(fill = "grey50"),
+#       plot.title = element_text(size = 18)
+#     )
+#   ) +
+#   plot_layout(
+#     ncol = 1,
+#     guides = "collect"
+#   ) &  theme(legend.direction = "vertical")
 ```
 
-### What are the busiest times of day???
+```{r Rescues by Species and Service Type in an Average Year, fig.height=8, fig.width=8}
+cat_year <- plot_animal_rescue_year_by_species(ar, "cat")
+bird_year <- plot_animal_rescue_year_by_species(ar, "bird")
+dog_year <- plot_animal_rescue_year_by_species(ar, "dog")
 
-```{r hour of day}
+year_plots <- plot_grid(cat_year, bird_year, dog_year,
+                        ncol = 1)
+years_title <- ggdraw() + 
+  draw_label("Average Weekly Rescues", size = 20, fontface = "bold") + 
+  theme(
+    plot.margin = margin(0,0,0,7),
+    plot.background = element_rect(fill = "grey50", color = "grey50")
+  )
+
+year_grid <- plot_grid(years_title, year_plots, ncol = 1, rel_heights = c(0.1,1))
+
+year_grid
+```
+
+
+### Average Day of Animal Rescues
+
+```{r set up functions for hourly plotting}
 ar_hourly_species_mode <- ar %>%
   filter(
     animal_group_parent %in% top3_species_list,
@@ -240,19 +259,81 @@ ar_hourly_species_mode <- ar %>%
   group_by(hour_of_day, animal_group_parent) %>%
   dplyr::summarise(mode_service = Mode(service_category))
 
-ar %>%
-  filter(animal_group_parent == "dog") %>%
-  count(animal_group_parent, cal_year, hour_of_day) %>%
-  group_by(animal_group_parent, hour_of_day) %>%
-  dplyr::summarise(avg = mean(n)) %>%
-  left_join(ar_hourly_species_mode) %>%
-  replace_na(list(mode_service = "Other")) %>%
-  ggplot(aes(hour_of_day, avg)) + 
-  geom_bar(aes(fill = mode_service), stat = "identity")
+plot_animal_rescues_hourly_by_species <- function(df = ar, species) {
+  df %>%
+    filter(animal_group_parent == species) %>%
+    count(animal_group_parent, cal_year, hour_of_day) %>%
+    group_by(animal_group_parent, hour_of_day) %>%
+    dplyr::summarise(avg = mean(n)) %>%
+    left_join(ar_hourly_species_mode) %>%
+    replace_na(list(mode_service = "Other")) %>%
+    #mutate(species = paste0(str_to_title(animal_group_parent)), "s") %>%
+    ggplot(aes(hour_of_day, avg)) + 
+    geom_bar(aes(fill = mode_service, color = mode_service), alpha = 0.75, stat = "identity", size = 1.5) + 
+    scale_fill_manual(values = c(
+      "Below Ground"= "burlywood3",
+      "Height" = "lightskyblue1",
+      "Water" = "royalblue",
+      "Other" = "gray10"
+    )) + 
+    scale_color_manual(values = c(
+      "Below Ground"= "burlywood3",
+      "Height" = "lightskyblue1",
+      "Water" = "royalblue",
+      "Other" = "gray10"
+    )) + 
+    labs(
+      title = paste0(str_to_title(species), "s"),
+      x = "",
+      y = "",
+      fill = "Rescued From (Mode)",
+      color = "Rescued From (Mode)"
+    ) +
+    facet_wrap(~ hour_of_day, scales = "free_x", ncol = 24) + 
+    theme_dark() + 
+    theme(
+      legend.position = ifelse(species == "dog", "bottom", "none"),
+      #legend.position =  "bottom",
+      legend.background = element_rect(fill = "grey50"),
+      plot.background = element_rect(fill = "grey50", color = "grey50"),
+      panel.grid.minor.x = element_blank(),
+      panel.grid.major.x = element_blank(),
+      panel.grid.minor.y = element_blank(),
+      axis.ticks.x = element_blank(),
+      axis.text.x = element_blank(),
+      plot.title = element_text(hjust = 0.5, size = 14)
+    )
+}
+```
+
+```{r Rescues by Species and Service Type in an Average Day, fig.height=8, fig.width=8}
+cat_hours <- plot_animal_rescues_hourly_by_species(ar, "cat")
+bird_hours <- plot_animal_rescues_hourly_by_species(ar, "bird")
+dog_hours <- plot_animal_rescues_hourly_by_species(ar, "dog")
+
+hour_plots <- plot_grid(cat_hours, bird_hours, dog_hours, ncol = 1)
+
+hours_title <- ggdraw() + 
+  draw_label("Average Hourly Rescues", fontface = "bold", size = 20) + 
+  theme(
+    plot.margin = margin(0,0,0,0),
+    plot.background = element_rect(fill = "grey50", color = "grey50")
+  )
+
+hour_grid <- plot_grid(hours_title, hour_plots, ncol = 1, rel_heights = c(0.1, 1))
+
+hour_grid
 ```
 
 
-### What propery types do most rescues occur at?
+### Paste Years and Hours Together
+
+```{r London Animal Rescues, fig.height=8, fig.width=16}
+plot_grid(year_grid, hour_grid)
+```
+
+
+## What propery types do most rescues occur at?
 
 ```{r}
 count(ar, property_type) %>%
