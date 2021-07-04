@@ -61,7 +61,7 @@ ar <- animal_rescues %>%
     date_time_of_call = as.POSIXct(date_time_of_call, format = "%d/%m/%Y %H:%M"),
     date = as.Date(date_time_of_call, format = "%d/%m/%Y"),
     floor_year_month = floor_date(date, "months"),
-    time = hour(date_time_of_call),
+    hour_of_day = hour(date_time_of_call),
     month_day = strftime(date_time_of_call, "%m-%d"),
     month = strftime(date_time_of_call, format = "%b"),
     week = week(date_time_of_call),
@@ -139,7 +139,7 @@ ar %>%
 
 ### What does an average year look like for animal rescue?
 
-```{r Rescues by Species and Service Type in an Average Year, fig.height=8, fig.width=10}
+```{r Rescues by Species and Service Type in an Average Year, fig.height=7, fig.width=8}
 ar_monthly_species_mode <- ar %>%
   filter(
     animal_group_parent %in% top3_species_list,
@@ -182,7 +182,7 @@ plot_animal_rescue_year_by_species <- function(df = ar, species) {
       "Below Ground"= "burlywood3",
       "Height" = "lightskyblue1",
       "Water" = "royalblue"
-    )) +
+    ), drop = FALSE) +
     scale_fill_manual(values = c(
       "Below Ground"= "burlywood3",
       "Height" = "lightskyblue1",
@@ -193,8 +193,8 @@ plot_animal_rescue_year_by_species <- function(df = ar, species) {
       title = plot_title,
       x = "",
       y = "Avg. Weekly Rescues",
-      fill = "Rescued... ",
-      color = "Rescued... "
+      fill = "Rescued From",
+      color = "Rescued From"
     ) + 
     theme_dark() + 
     theme(
@@ -204,9 +204,10 @@ plot_animal_rescue_year_by_species <- function(df = ar, species) {
       axis.ticks.x = element_blank(),
       panel.grid.minor.y = element_blank(),
       axis.text.x = element_blank(),
-      legend.position = "bottom",
+      legend.position = ifelse(species == "dog", "bottom", "none"),
+      #legend.position = "bottom",
       legend.background = element_rect(fill = "grey50"),
-      plot.title = element_text(hjust = 0.5, size = 20)
+      plot.title = element_text(hjust = 0.5, size = 14)
     )
   
   plot
@@ -215,14 +216,39 @@ plot_animal_rescue_year_by_species <- function(df = ar, species) {
 plot_animal_rescue_year_by_species(ar, "cat") + 
   plot_animal_rescue_year_by_species(ar, "bird") + 
   plot_animal_rescue_year_by_species(ar, "dog") +
+  plot_annotation(
+    title = glue("Average Weekly Animal Rescues in London over the past {df_duration} years"),
+    theme = theme(
+      plot.background = element_rect(fill = "grey50"),
+      plot.title = element_text(size = 18)
+    )
+  ) +
   plot_layout(
     ncol = 1,
     guides = "collect"
-  ) + 
-  plot_annotation(
-    title = glue("Average Weekly Animal Rescues in London over the past {df_duration} years")
-  ) & 
-  theme(legend.position = "bottom")
+  ) &  theme(legend.direction = "vertical")
+```
+
+### What are the busiest times of day???
+
+```{r hour of day}
+ar_hourly_species_mode <- ar %>%
+  filter(
+    animal_group_parent %in% top3_species_list,
+    service_category != "Other Animal Assistance"
+  ) %>%
+  group_by(hour_of_day, animal_group_parent) %>%
+  dplyr::summarise(mode_service = Mode(service_category))
+
+ar %>%
+  filter(animal_group_parent == "dog") %>%
+  count(animal_group_parent, cal_year, hour_of_day) %>%
+  group_by(animal_group_parent, hour_of_day) %>%
+  dplyr::summarise(avg = mean(n)) %>%
+  left_join(ar_hourly_species_mode) %>%
+  replace_na(list(mode_service = "Other")) %>%
+  ggplot(aes(hour_of_day, avg)) + 
+  geom_bar(aes(fill = mode_service), stat = "identity")
 ```
 
 
@@ -232,9 +258,6 @@ plot_animal_rescue_year_by_species(ar, "cat") +
 count(ar, property_type) %>%
   arrange(desc(n))
 ```
-
-
-### What are the busiest times of day?
 
 ## Where do animals get rescued from the most?
 
