@@ -16,6 +16,7 @@ knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning=FALSE)
 library(forcats)
 library(glue)
 library(lubridate)
+library(patchwork)
 library(readr)
 library(tidyverse)
 ```
@@ -55,17 +56,20 @@ ar <- animal_rescues %>%
   ) %>%
   mutate(
     animal_group_parent = str_to_lower(animal_group_parent),
+    
     # time
     date_time_of_call = as.POSIXct(date_time_of_call, format = "%d/%m/%Y %H:%M"),
     date = as.Date(date_time_of_call, format = "%d/%m/%Y"),
     floor_year_month = floor_date(date, "months"),
     time = hour(date_time_of_call),
     month_day = strftime(date_time_of_call, "%m-%d"),
-    month = strftime(date_time_of_call, format = "%m\n%b"),
+    month = strftime(date_time_of_call, format = "%b"),
+    week = week(date_time_of_call),
     day = day(date_time_of_call),
+    
     # special service categories
     special_service_type_category = str_to_lower(special_service_type_category),
-    service_category = str_remove(special_service_type_category, "animal rescue from")
+    service_category = str_to_title(str_remove(special_service_type_category, "animal rescue from "))
   )
 
 unredacted <- ar %>%
@@ -74,8 +78,8 @@ unredacted <- ar %>%
 
 ```{r}
 # values
-min_date <- strftime(min(ar$date), format = "%d-%b-%Y")
-max_date <- strftime(max(ar$date), format = "%d-%b-%Y")
+min_date <- strftime(min(ar$date), format = "%b %d, %Y")
+max_date <- strftime(max(ar$date), format = "%b %d, %Y")
 ```
 
 
@@ -135,11 +139,11 @@ ar %>%
 
 ### What does an average year look like for animal rescue?
 
-```{r Rescues by Species and Service Type in an Average Year, fig.height=5, fig.width=10}
+```{r Rescues by Species and Service Type in an Average Year, fig.height=8, fig.width=10}
 ar_monthly_species_mode <- ar %>%
   filter(
     animal_group_parent %in% top3_species_list,
-    service_category != "other animal assistance"
+    service_category != "Other Animal Assistance"
   ) %>%
   group_by(month, animal_group_parent) %>%
   dplyr::summarise(mode_service = Mode(service_category))
@@ -147,33 +151,86 @@ ar_monthly_species_mode <- ar %>%
 ar_monthly_species_mode %>%
   filter(animal_group_parent == "dog")
 
-ar %>%
-  mutate(
-    month = strftime(date_time_of_call, format = "%m\n%b"),
-    day = day(date_time_of_call)
+month_levels <- c("Jan", "Feb", "Mar", "Apr",
+                  "May", "Jun", "Jul", "Aug",
+                  "Sep", "Oct", "Nov", "Dec")
+
+df_duration <- round(as.numeric(difftime(max(ar$date_time_of_call), 
+                                         min(ar$date_time_of_call), 
+                                         unit = "weeks")) / 52.25)
+
+plot_animal_rescue_year_by_species <- function(df = ar, species) {
+  plot_title = paste0(str_to_title(species), "s")
+  
+  plot <- df %>%
+    filter(animal_group_parent == species) %>%
+    group_by(cal_year, month, week, animal_group_parent) %>%
+    dplyr::summarise(n = n()) %>%
+    group_by(month, week, animal_group_parent) %>%
+    dplyr::summarise(
+      avg = mean(n),
+      sd = sd(n),
+      min = min(n),
+      max = max(n)
     ) %>%
-  filter(animal_group_parent == "dog") %>%
-  # group_by(cal_year, month, day, animal_group_parent) %>%
-  # dplyr::summarise(n = n()) %>%
-  # group_by(month, day, animal_group_parent) %>%
-  # mutate(avg = mean(n)) %>%
-  # ungroup() %>%
-  count(month, day, animal_group_parent) %>%
-  left_join(ar_monthly_species_mode) %>%
-  ggplot(aes(day, n)) +
-  geom_line() +
-  geom_area(aes(fill = mode_service)) +
-  facet_wrap(~ month, ncol = 12) + 
-  labs(
-    title = glue("Count of dog rescues each day of an average calendar year (from {min_date} to {max_date})"),
-    subtitle = "Number of rescues on each day plotted. Would average be betterto plot on y-axis?",
-    caption = "This graph needs to be repeated for each of the other top three species, and then each plot should be stacked."
+    left_join(ar_monthly_species_mode) %>%
+    ggplot(aes(week, avg)) +
+    geom_line(aes(color = mode_service), size = 1.5) +
+    geom_point(aes(color = mode_service), size = 3) + 
+    geom_area(aes(fill = mode_service), alpha = 0.65) +
+    scale_color_manual(values = c(
+      "Below Ground"= "burlywood3",
+      "Height" = "lightskyblue1",
+      "Water" = "royalblue"
+    )) +
+    scale_fill_manual(values = c(
+      "Below Ground"= "burlywood3",
+      "Height" = "lightskyblue1",
+      "Water" = "royalblue"
+    )) +
+    facet_wrap(~ factor(month, levels = month_levels), ncol = 12, scales = "free_x") + 
+    labs(
+      title = plot_title,
+      x = "",
+      y = "Avg. Weekly Rescues",
+      fill = "Rescued... ",
+      color = "Rescued... "
+    ) + 
+    theme_dark() + 
+    theme(
+      plot.background = element_rect(fill = "gray50"),
+      panel.grid.major.x = element_blank(),
+      panel.grid.minor.x = element_blank(),
+      axis.ticks.x = element_blank(),
+      panel.grid.minor.y = element_blank(),
+      axis.text.x = element_blank(),
+      legend.position = "bottom",
+      legend.background = element_rect(fill = "grey50"),
+      plot.title = element_text(hjust = 0.5, size = 20)
+    )
+  
+  plot
+}
+
+plot_animal_rescue_year_by_species(ar, "cat") + 
+  plot_animal_rescue_year_by_species(ar, "bird") + 
+  plot_animal_rescue_year_by_species(ar, "dog") +
+  plot_layout(
+    ncol = 1,
+    guides = "collect"
   ) + 
-  theme_minimal() + 
-  theme(
-    axis.text.x = element_blank(),
-    legend.position = "bottom"
-  )
+  plot_annotation(
+    title = glue("Average Weekly Animal Rescues in London over the past {df_duration} years")
+  ) & 
+  theme(legend.position = "bottom")
+```
+
+
+### What propery types do most rescues occur at?
+
+```{r}
+count(ar, property_type) %>%
+  arrange(desc(n))
 ```
 
 
