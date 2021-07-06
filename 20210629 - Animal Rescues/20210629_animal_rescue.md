@@ -100,6 +100,7 @@ unredacted <- ar %>%
 # values
 min_date <- strftime(min(ar$date), format = "%b %d, %Y")
 max_date <- strftime(max(ar$date), format = "%b %d, %Y")
+unique_species <- length(unique(ar$animal_group_parent))
 ```
 
 ``` r
@@ -486,7 +487,7 @@ dog_pie <- plot_service_type_pie(ar_pie, "dog")
 pies <- plot_grid(cat_pie, bird_pie, dog_pie, ncol = 3)
 ```
 
-#### Grid the top layer
+#### Patchwork all plots
 
 ``` r
 # plot_grid(species_bar, service_bar, cat_pie, bird_pie, dog_pie,
@@ -496,10 +497,13 @@ pies <- plot_grid(cat_pie, bird_pie, dog_pie, ncol = 3)
   years_hours_plots + 
   plot_layout(heights = c(3,13)) + 
   plot_annotation(
-    title = glue("Animal Rescues in London in the past {df_duration} years"),
+    title = glue("Animal Rescues in London for the past {df_duration} years"),
+    subtitle = glue("While there were {unique_species} unique species rescued from {min_date} to {max_date}; cats, birds, and dogs made up the majority of those rescues. Aside from 'Other' service types; cats and birds were rescued primarily from height while Dogs had a more even distribution. An average year of rescues features marked seasonality for cats and birds, while dogs appear to be relatively constant throughout the year. Interestingly the service type for dogs changes with the seasons! Perhaps more dogs are falling into frozen lakes in the winter. Finally, most animal rescues occur during waking hours, with water rescues for dogs being concentrated in the late morning hours.\n"),
     caption = "Source: london.gov (https://data.london.gov.uk/dataset/animal-rescue-incidents-attended-by-lfb)",
     theme = theme(
       plot.title = element_text(size = 36, hjust = 0.5),
+      plot.subtitle = element_textbox_simple(size = 16, margin = margin(5,16,7,16), face = "italic", hjust = 0.5, halign = 0.5),
+      plot.caption = element_text(size = 12),
       plot.background = element_rect(fill = "gray50")
     )
   )
