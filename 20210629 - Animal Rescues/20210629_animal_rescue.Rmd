@@ -20,12 +20,15 @@ library(lubridate)
 library(patchwork)
 library(readr)
 library(tidyverse)
+library(ggtext)
 ```
 
 ```{r}
 # data
 animal_rescues <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-06-29/animal_rescues.csv')
 ```
+
+![image](https://www.desktopbackground.org/p/2014/04/26/753179_friends-cats-birds-dogs-animals-rabbit-hd-wallpapers_1772x1260_h.jpg)
 
 # Introduction
 
@@ -92,7 +95,6 @@ Mode <- function(x) {
 }
 ```
 
-
 # Exploratory Data Analysis
 
 ## Notes
@@ -113,9 +115,7 @@ count(ar, originof_call) %>%
 
 I don't think there is much insight to be gleaned from whether the call was made from a landline or mobile device.
 
-# Data Visualization Projects
-
-## Choropleth of animal rescues
+# Data Visualization Project
 
 ## Timeline of animal rescue
 
@@ -207,22 +207,6 @@ plot_animal_rescue_year_by_species <- function(df = ar, species) {
   
   plot
 }
-
-## PATCHWORK Legend Position "Bottom" is bugged
-# plot_animal_rescue_year_by_species(ar, "cat") + 
-#   plot_animal_rescue_year_by_species(ar, "bird") + 
-#   plot_animal_rescue_year_by_species(ar, "dog") +
-#   plot_annotation(
-#     title = glue("Average Weekly Animal Rescues in London over the past {df_duration} years"),
-#     theme = theme(
-#       plot.background = element_rect(fill = "grey50"),
-#       plot.title = element_text(size = 18)
-#     )
-#   ) +
-#   plot_layout(
-#     ncol = 1,
-#     guides = "collect"
-#   ) &  theme(legend.direction = "vertical")
 ```
 
 ```{r Rescues by Species and Service Type in an Average Year, fig.height=8, fig.width=8}
@@ -325,10 +309,8 @@ hour_grid
 
 ### Paste Years and Hours Together
 
-```{r London Animal Rescues, fig.height=8, fig.width=16}
+```{r London Animal Rescues Avg Times, fig.height=8, fig.width=16}
 years_hours_plots <- plot_grid(year_grid, hour_grid)
-
-years_hours_plots
 ```
 
 ### Top Level Graphics
@@ -361,8 +343,6 @@ species_bar <- ar %>%
     panel.background = element_rect(fill = "gray50"),
     legend.position = "none"
   )
-
-species_bar
 ```
 
 #### Most represented service types
@@ -400,8 +380,6 @@ service_bar <- ar %>%
     plot.title = element_text(hjust = 0.5, size = 14),
     legend.position = "none"
   )
-
-service_bar
 ```
 
 
@@ -460,13 +438,11 @@ bird_pie <- plot_service_type_pie(ar_pie, "bird")
 dog_pie <- plot_service_type_pie(ar_pie, "dog")
 
 pies <- plot_grid(cat_pie, bird_pie, dog_pie, ncol = 3)
-
-pies
 ```
 
 #### Grid the top layer
 
-```{r top layer, fig.height=12, fig.width=16}
+```{r London Animal Rescues, fig.height=12, fig.width=16}
 # plot_grid(species_bar, service_bar, cat_pie, bird_pie, dog_pie,
 #           ncol = 5, align = "h", axis = "bt")
 (species_bar + service_bar + cat_pie + bird_pie + dog_pie +
@@ -475,6 +451,7 @@ pies
   plot_layout(heights = c(3,13)) + 
   plot_annotation(
     title = glue("Animal Rescues in London in the past {df_duration} years"),
+    caption = "Source: london.gov (https://data.london.gov.uk/dataset/animal-rescue-incidents-attended-by-lfb)",
     theme = theme(
       plot.title = element_text(size = 36, hjust = 0.5),
       plot.background = element_rect(fill = "gray50")
@@ -483,16 +460,3 @@ pies
 ```
 
 
-
-## What propery types do most rescues occur at?
-
-```{r}
-count(ar, property_type) %>%
-  arrange(desc(n))
-```
-
-## What animals cost the most to rescue?
-
-Normalize by hours spent?
-
-## What kind of properties do animals most routinely get trapped in?

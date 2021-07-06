@@ -6,8 +6,7 @@ Nick Cruickshank
   - [Introduction](#introduction)
   - [Exploratory Data Analysis](#exploratory-data-analysis)
       - [Notes](#notes)
-  - [Data Visualization Projects](#data-visualization-projects)
-      - [Choropleth of animal rescues](#choropleth-of-animal-rescues)
+  - [Data Visualization Project](#data-visualization-project)
       - [Timeline of animal rescue](#timeline-of-animal-rescue)
           - [Average Year of Animal
             Rescues](#average-year-of-animal-rescues)
@@ -15,14 +14,7 @@ Nick Cruickshank
             Rescues](#average-day-of-animal-rescues)
           - [Paste Years and Hours
             Together](#paste-years-and-hours-together)
-      - [What propery types do most rescues occur
-        at?](#what-propery-types-do-most-rescues-occur-at)
-      - [Where do animals get rescued from the
-        most?](#where-do-animals-get-rescued-from-the-most)
-      - [What animals cost the most to
-        rescue?](#what-animals-cost-the-most-to-rescue)
-      - [What kind of properties do animals most routinely get trapped
-        in?](#what-kind-of-properties-do-animals-most-routinely-get-trapped-in)
+          - [Top Level Graphics](#top-level-graphics)
 
 ``` r
 # libraries
@@ -33,12 +25,15 @@ library(lubridate)
 library(patchwork)
 library(readr)
 library(tidyverse)
+library(ggtext)
 ```
 
 ``` r
 # data
 animal_rescues <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-06-29/animal_rescues.csv')
 ```
+
+![image](https://www.desktopbackground.org/p/2014/04/26/753179_friends-cats-birds-dogs-animals-rabbit-hd-wallpapers_1772x1260_h.jpg)
 
 # Introduction
 
@@ -163,9 +158,7 @@ count(ar, originof_call) %>%
 I don’t think there is much insight to be gleaned from whether the call
 was made from a landline or mobile device.
 
-# Data Visualization Projects
-
-## Choropleth of animal rescues
+# Data Visualization Project
 
 ## Timeline of animal rescue
 
@@ -198,28 +191,6 @@ ar_monthly_species_mode <- ar %>%
   group_by(month, animal_group_parent) %>%
   dplyr::summarise(mode_service = Mode(service_category))
 
-ar_monthly_species_mode %>%
-  filter(animal_group_parent == "dog")
-```
-
-    ## # A tibble: 12 x 3
-    ## # Groups:   month [12]
-    ##    month animal_group_parent mode_service
-    ##    <chr> <chr>               <chr>       
-    ##  1 Apr   dog                 Below Ground
-    ##  2 Aug   dog                 Height      
-    ##  3 Dec   dog                 Water       
-    ##  4 Feb   dog                 Water       
-    ##  5 Jan   dog                 Water       
-    ##  6 Jul   dog                 Height      
-    ##  7 Jun   dog                 Height      
-    ##  8 Mar   dog                 Below Ground
-    ##  9 May   dog                 Height      
-    ## 10 Nov   dog                 Water       
-    ## 11 Oct   dog                 Below Ground
-    ## 12 Sep   dog                 Below Ground
-
-``` r
 month_levels <- c("Jan", "Feb", "Mar", "Apr",
                   "May", "Jun", "Jul", "Aug",
                   "Sep", "Oct", "Nov", "Dec")
@@ -273,30 +244,14 @@ plot_animal_rescue_year_by_species <- function(df = ar, species) {
       axis.ticks.x = element_blank(),
       panel.grid.minor.y = element_blank(),
       axis.text.x = element_blank(),
-      legend.position = ifelse(species == "dog", "bottom", "none"),
-      #legend.position = "bottom",
+      #legend.position = ifelse(species == "dog", "bottom", "none"),
+      legend.position = "none",
       legend.background = element_rect(fill = "grey50"),
       plot.title = element_text(hjust = 0.5, size = 14)
     )
   
   plot
 }
-
-## PATCHWORK Legend Position "Bottom" is bugged
-# plot_animal_rescue_year_by_species(ar, "cat") + 
-#   plot_animal_rescue_year_by_species(ar, "bird") + 
-#   plot_animal_rescue_year_by_species(ar, "dog") +
-#   plot_annotation(
-#     title = glue("Average Weekly Animal Rescues in London over the past {df_duration} years"),
-#     theme = theme(
-#       plot.background = element_rect(fill = "grey50"),
-#       plot.title = element_text(size = 18)
-#     )
-#   ) +
-#   plot_layout(
-#     ncol = 1,
-#     guides = "collect"
-#   ) &  theme(legend.direction = "vertical")
 ```
 
 ``` r
@@ -364,8 +319,8 @@ plot_animal_rescues_hourly_by_species <- function(df = ar, species) {
     facet_wrap(~ hour_of_day, scales = "free_x", ncol = 24) + 
     theme_dark() + 
     theme(
-      legend.position = ifelse(species == "dog", "bottom", "none"),
-      #legend.position =  "bottom",
+      #legend.position = ifelse(species == "dog", "bottom", "none"),
+      legend.position =  "none",
       legend.background = element_rect(fill = "grey50"),
       plot.background = element_rect(fill = "grey50", color = "grey50"),
       panel.grid.minor.x = element_blank(),
@@ -402,37 +357,152 @@ hour_grid
 ### Paste Years and Hours Together
 
 ``` r
-plot_grid(year_grid, hour_grid)
+years_hours_plots <- plot_grid(year_grid, hour_grid)
+```
+
+### Top Level Graphics
+
+#### Most represented species
+
+``` r
+species_bar <- ar %>%
+  mutate(
+    animal_group_parent = ifelse(animal_group_parent %in% top3_species_list, animal_group_parent, "Other"),
+    top3 = ifelse(animal_group_parent %in% top3_species_list, "Top 3", "Other")
+  ) %>%
+  count(animal_group_parent, top3) %>%
+  arrange(desc(n)) %>%
+  ggplot(aes(fct_reorder(animal_group_parent, n), n)) + 
+  geom_bar(aes(fill = top3), stat = "identity", color = "black", alpha = 0.5, size = 2) + 
+  scale_fill_manual(values = c(
+    "Other" = "gray10",
+    "Top 3" = "gray90"
+  )) + 
+  geom_text(aes(y = 50, label = paste0(str_to_title(animal_group_parent), "s")), hjust = "left", fontface = "bold") +
+  coord_flip() + 
+  labs(
+    title = "Count by Species"
+  ) + 
+  theme_void() + 
+  theme(
+    plot.background = element_rect(fill = "gray50", color = "gray50"),
+    plot.title = element_text(hjust = 0.5, size = 14),
+    panel.background = element_rect(fill = "gray50"),
+    legend.position = "none"
+  )
+```
+
+#### Most represented service types
+
+``` r
+service_bar <- ar %>%
+  count(service_category) %>%
+  mutate(
+    service_category = ifelse(str_detect(service_category, "Other"), "Other", service_category),
+    relevant_services = ifelse(service_category == "Other", "Other", "Relevant")
+  ) %>%
+  arrange(desc(n)) %>%
+  ggplot(aes(fct_reorder(service_category, n), n)) + 
+  geom_bar(aes(fill = service_category, color = service_category), size = 2, stat = "identity", alpha = 0.5) + 
+  scale_fill_manual(values = c(
+      "Below Ground"= "burlywood3",
+      "Height" = "lightskyblue1",
+      "Water" = "royalblue",
+      "Other" = "gray10"
+    )) + 
+    scale_color_manual(values = c(
+      "Below Ground"= "burlywood3",
+      "Height" = "lightskyblue1",
+      "Water" = "royalblue",
+      "Other" = "gray10"
+    )) + 
+  geom_text(aes(y = 50, label = service_category), hjust = "left", fontface = "bold") + 
+  coord_flip() + 
+  labs(
+    title = "Count by Service Type"
+  ) +
+  theme_void() + 
+  theme(
+    plot.background = element_rect(fill = "gray50", color = "gray50"),
+    plot.title = element_text(hjust = 0.5, size = 14),
+    legend.position = "none"
+  )
+```
+
+#### Pie service type by species
+
+``` r
+ar_pie <- ar %>%
+  filter(animal_group_parent %in% top3_species_list) %>%
+  count(animal_group_parent, service_category) %>%
+  mutate(
+    service_category = ifelse(str_detect(service_category, "Other"), "Other", service_category)
+  ) 
+
+plot_service_type_pie <- function(df = ar_pie, species) {
+  pie_title <- paste0(str_to_title(species), "s")
+  
+  plot <- df %>%
+    filter(animal_group_parent == species) %>%
+    arrange(desc(service_category)) %>%
+    mutate(
+      prop = n / sum(filter(ar_pie, animal_group_parent == species)$n) * 100,
+      ypos = cumsum(prop) - 0.5*prop,
+      perc = paste0(round(prop, 2), "%")
+    ) %>%
+    ggplot(aes(x = "", y = prop, fill = service_category, color = service_category)) + 
+    geom_bar(width = 1, stat = "identity", alpha = 0.4, size = 2) + 
+    coord_polar("y", start = 0) + 
+    scale_fill_manual(values = c(
+      "Below Ground"= "burlywood3",
+      "Height" = "lightskyblue1",
+      "Water" = "royalblue",
+      "Other" = "gray10"
+    )) + 
+    scale_color_manual(values = c(
+      "Below Ground"= "burlywood3",
+      "Height" = "lightskyblue1",
+      "Water" = "royalblue",
+      "Other" = "gray10"
+    )) + 
+    #geom_text(aes(y = ypos, label = paste0(service_category, "\n", perc)), fontface = "bold") + 
+    labs(
+      title = pie_title
+    ) + 
+    theme_void() + 
+    theme(
+      plot.background = element_rect(fill = "grey50", color = "gray50"),
+      legend.position = "none",
+      plot.title = element_text(hjust = 0.5, size = 14)
+    )
+  
+  plot
+}
+
+cat_pie <- plot_service_type_pie(ar_pie, "cat")
+bird_pie <- plot_service_type_pie(ar_pie, "bird") 
+dog_pie <- plot_service_type_pie(ar_pie, "dog")
+
+pies <- plot_grid(cat_pie, bird_pie, dog_pie, ncol = 3)
+```
+
+#### Grid the top layer
+
+``` r
+# plot_grid(species_bar, service_bar, cat_pie, bird_pie, dog_pie,
+#           ncol = 5, align = "h", axis = "bt")
+(species_bar + service_bar + cat_pie + bird_pie + dog_pie +
+  plot_layout(ncol = 5)) /
+  years_hours_plots + 
+  plot_layout(heights = c(3,13)) + 
+  plot_annotation(
+    title = glue("Animal Rescues in London in the past {df_duration} years"),
+    caption = "Source: london.gov (https://data.london.gov.uk/dataset/animal-rescue-incidents-attended-by-lfb)",
+    theme = theme(
+      plot.title = element_text(size = 36, hjust = 0.5),
+      plot.background = element_rect(fill = "gray50")
+    )
+  )
 ```
 
 ![](20210629_animal_rescue_files/figure-gfm/London%20Animal%20Rescues-1.png)<!-- -->
-
-## What propery types do most rescues occur at?
-
-``` r
-count(ar, property_type) %>%
-  arrange(desc(n))
-```
-
-    ## # A tibble: 179 x 2
-    ##    property_type                                         n
-    ##    <chr>                                             <int>
-    ##  1 House - single occupancy                           1867
-    ##  2 Purpose Built Flats/Maisonettes - Up to 3 storeys   599
-    ##  3 Purpose Built Flats/Maisonettes - 4 to 9 storeys    587
-    ##  4 Tree scrub                                          321
-    ##  5 Animal harm outdoors                                280
-    ##  6 Converted Flat/Maisonettes - 3 or more storeys      254
-    ##  7 Car                                                 241
-    ##  8 Domestic garden (vegetation not equipment)          221
-    ##  9 Converted Flat/Maisonette - Up to 2 storeys         207
-    ## 10 Park                                                180
-    ## # ... with 169 more rows
-
-## Where do animals get rescued from the most?
-
-## What animals cost the most to rescue?
-
-Normalize by hours spent?
-
-## What kind of properties do animals most routinely get trapped in?
