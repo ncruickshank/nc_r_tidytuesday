@@ -146,9 +146,6 @@ ar_monthly_species_mode <- ar %>%
   group_by(month, animal_group_parent) %>%
   dplyr::summarise(mode_service = Mode(service_category))
 
-ar_monthly_species_mode %>%
-  filter(animal_group_parent == "dog")
-
 month_levels <- c("Jan", "Feb", "Mar", "Apr",
                   "May", "Jun", "Jul", "Aug",
                   "Sep", "Oct", "Nov", "Dec")
@@ -202,8 +199,8 @@ plot_animal_rescue_year_by_species <- function(df = ar, species) {
       axis.ticks.x = element_blank(),
       panel.grid.minor.y = element_blank(),
       axis.text.x = element_blank(),
-      legend.position = ifelse(species == "dog", "bottom", "none"),
-      #legend.position = "bottom",
+      #legend.position = ifelse(species == "dog", "bottom", "none"),
+      legend.position = "none",
       legend.background = element_rect(fill = "grey50"),
       plot.title = element_text(hjust = 0.5, size = 14)
     )
@@ -292,8 +289,8 @@ plot_animal_rescues_hourly_by_species <- function(df = ar, species) {
     facet_wrap(~ hour_of_day, scales = "free_x", ncol = 24) + 
     theme_dark() + 
     theme(
-      legend.position = ifelse(species == "dog", "bottom", "none"),
-      #legend.position =  "bottom",
+      #legend.position = ifelse(species == "dog", "bottom", "none"),
+      legend.position =  "none",
       legend.background = element_rect(fill = "grey50"),
       plot.background = element_rect(fill = "grey50", color = "grey50"),
       panel.grid.minor.x = element_blank(),
@@ -329,8 +326,162 @@ hour_grid
 ### Paste Years and Hours Together
 
 ```{r London Animal Rescues, fig.height=8, fig.width=16}
-plot_grid(year_grid, hour_grid)
+years_hours_plots <- plot_grid(year_grid, hour_grid)
+
+years_hours_plots
 ```
+
+### Top Level Graphics
+
+#### Most represented species
+
+```{r fig.width=3}
+species_bar <- ar %>%
+  mutate(
+    animal_group_parent = ifelse(animal_group_parent %in% top3_species_list, animal_group_parent, "Other"),
+    top3 = ifelse(animal_group_parent %in% top3_species_list, "Top 3", "Other")
+  ) %>%
+  count(animal_group_parent, top3) %>%
+  arrange(desc(n)) %>%
+  ggplot(aes(fct_reorder(animal_group_parent, n), n)) + 
+  geom_bar(aes(fill = top3), stat = "identity", color = "black", alpha = 0.5, size = 2) + 
+  scale_fill_manual(values = c(
+    "Other" = "gray10",
+    "Top 3" = "gray90"
+  )) + 
+  geom_text(aes(y = 50, label = paste0(str_to_title(animal_group_parent), "s")), hjust = "left", fontface = "bold") +
+  coord_flip() + 
+  labs(
+    title = "Count by Species"
+  ) + 
+  theme_void() + 
+  theme(
+    plot.background = element_rect(fill = "gray50", color = "gray50"),
+    plot.title = element_text(hjust = 0.5, size = 14),
+    panel.background = element_rect(fill = "gray50"),
+    legend.position = "none"
+  )
+
+species_bar
+```
+
+#### Most represented service types
+
+```{r service types bar}
+service_bar <- ar %>%
+  count(service_category) %>%
+  mutate(
+    service_category = ifelse(str_detect(service_category, "Other"), "Other", service_category),
+    relevant_services = ifelse(service_category == "Other", "Other", "Relevant")
+  ) %>%
+  arrange(desc(n)) %>%
+  ggplot(aes(fct_reorder(service_category, n), n)) + 
+  geom_bar(aes(fill = service_category, color = service_category), size = 2, stat = "identity", alpha = 0.5) + 
+  scale_fill_manual(values = c(
+      "Below Ground"= "burlywood3",
+      "Height" = "lightskyblue1",
+      "Water" = "royalblue",
+      "Other" = "gray10"
+    )) + 
+    scale_color_manual(values = c(
+      "Below Ground"= "burlywood3",
+      "Height" = "lightskyblue1",
+      "Water" = "royalblue",
+      "Other" = "gray10"
+    )) + 
+  geom_text(aes(y = 50, label = service_category), hjust = "left", fontface = "bold") + 
+  coord_flip() + 
+  labs(
+    title = "Count by Service Type"
+  ) +
+  theme_void() + 
+  theme(
+    plot.background = element_rect(fill = "gray50", color = "gray50"),
+    plot.title = element_text(hjust = 0.5, size = 14),
+    legend.position = "none"
+  )
+
+service_bar
+```
+
+
+#### Pie service type by species
+
+```{r animal pies}
+ar_pie <- ar %>%
+  filter(animal_group_parent %in% top3_species_list) %>%
+  count(animal_group_parent, service_category) %>%
+  mutate(
+    service_category = ifelse(str_detect(service_category, "Other"), "Other", service_category)
+  ) 
+
+plot_service_type_pie <- function(df = ar_pie, species) {
+  pie_title <- paste0(str_to_title(species), "s")
+  
+  plot <- df %>%
+    filter(animal_group_parent == species) %>%
+    arrange(desc(service_category)) %>%
+    mutate(
+      prop = n / sum(filter(ar_pie, animal_group_parent == species)$n) * 100,
+      ypos = cumsum(prop) - 0.5*prop,
+      perc = paste0(round(prop, 2), "%")
+    ) %>%
+    ggplot(aes(x = "", y = prop, fill = service_category, color = service_category)) + 
+    geom_bar(width = 1, stat = "identity", alpha = 0.4, size = 2) + 
+    coord_polar("y", start = 0) + 
+    scale_fill_manual(values = c(
+      "Below Ground"= "burlywood3",
+      "Height" = "lightskyblue1",
+      "Water" = "royalblue",
+      "Other" = "gray10"
+    )) + 
+    scale_color_manual(values = c(
+      "Below Ground"= "burlywood3",
+      "Height" = "lightskyblue1",
+      "Water" = "royalblue",
+      "Other" = "gray10"
+    )) + 
+    #geom_text(aes(y = ypos, label = paste0(service_category, "\n", perc)), fontface = "bold") + 
+    labs(
+      title = pie_title
+    ) + 
+    theme_void() + 
+    theme(
+      plot.background = element_rect(fill = "grey50", color = "gray50"),
+      legend.position = "none",
+      plot.title = element_text(hjust = 0.5, size = 14)
+    )
+  
+  plot
+}
+
+cat_pie <- plot_service_type_pie(ar_pie, "cat")
+bird_pie <- plot_service_type_pie(ar_pie, "bird") 
+dog_pie <- plot_service_type_pie(ar_pie, "dog")
+
+pies <- plot_grid(cat_pie, bird_pie, dog_pie, ncol = 3)
+
+pies
+```
+
+#### Grid the top layer
+
+```{r top layer, fig.height=12, fig.width=16}
+# plot_grid(species_bar, service_bar, cat_pie, bird_pie, dog_pie,
+#           ncol = 5, align = "h", axis = "bt")
+(species_bar + service_bar + cat_pie + bird_pie + dog_pie +
+  plot_layout(ncol = 5)) /
+  years_hours_plots + 
+  plot_layout(heights = c(3,13)) + 
+  plot_annotation(
+    title = glue("Animal Rescues in London in the past {df_duration} years"),
+    theme = theme(
+      plot.title = element_text(size = 36, hjust = 0.5),
+      plot.background = element_rect(fill = "gray50")
+    )
+  )
+```
+
 
 
 ## What propery types do most rescues occur at?
@@ -339,8 +490,6 @@ plot_grid(year_grid, hour_grid)
 count(ar, property_type) %>%
   arrange(desc(n))
 ```
-
-## Where do animals get rescued from the most?
 
 ## What animals cost the most to rescue?
 
