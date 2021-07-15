@@ -1,0 +1,113 @@
+---
+title: "20210713 - Scooby Doo"
+author: "Nick Cruickshank"
+date: "7/14/2021"
+output: 
+  github_document:
+    toc: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning=FALSE)
+```
+
+```{r libraries}
+# libraries
+library(lubridate)
+library(plotly)
+library(readr)
+library(tidyverse)
+```
+
+```{r}
+# data
+scoobydoo <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-07-13/scoobydoo.csv')
+```
+
+![scooby doo](https://media.avalonhill.wizards.com/styles/second_hubpage_banner/public/images/dynamichubpage/lwclkwcwqcn.jpg)
+
+# Introduction
+
+This weeks [Tidy Tuesday](https://github.com/rfordatascience/tidytuesday/tree/master/data/2021/2021-07-13) dataset comes from [Kaggle](https://www.kaggle.com/williamschooleman/scoobydoo-complete) by way of manual data aggregation from [plummye](https://www.kaggle.com/williamschooleman).
+
+> Every Scooby-Doo episode and movie's various variables.
+>
+> Took ~1 year to watch every Scooby-Doo iteration and track every variable. Many values are subjective by nature of watching but I tried my hardest to keep the data collection consistent.
+>
+> If you plan to use this data for anything school/entertainment related you are free to (credit is always welcome).
+
+# Exploratory Data Analysis
+
+```{r}
+scoobydoo
+```
+
+```{r}
+# tidy data
+```
+
+
+## IMDB Score Over Time
+
+```{r}
+series_dates <- scoobydoo %>%
+  mutate(year = year(date_aired)) %>%
+  group_by(series_name) %>%
+  dplyr::summarise(
+    series_start = min(date_aired),
+    series_end = max(date_aired)
+  )
+```
+
+
+```{r}
+scooby_imdb_seasons <- scoobydoo %>%
+  mutate(imdb = as.double(imdb)) %>%
+  group_by(series_name, season) %>%
+  dplyr::summarise(
+    episodes = n(),
+    mean_imdb = mean(imdb, na.rm = TRUE)
+  ) %>%
+  ungroup() %>%
+  filter(
+    episodes > 1,
+    !(is.na(mean_imdb))
+    ) %>%
+  left_join(series_dates) %>%
+  arrange(series_start)
+
+plot_ly(scooby_imdb_seasons, x = ~series_start) %>%
+  add_trace(y = ~mean_imdb, name = 'trendline', mode = 'markers') %>%
+  #add_ribbons(xmin = ~series_start, xmax = ~series_end, ymin = -Inf, ymax = Inf, color = ~series_name) %>%
+  layout(
+    title = "Time Series Analysis of Average IMDb Scores for Scooby Doo Seasons",
+    xaxis = list(title = "Series Start Date"),
+    yaxis = list(title = "Mean IMDb Score")
+  )
+```
+
+## Distriubtion of Monsters 
+
+### Gender
+
+### By Type
+
+And subtype?
+
+Or Species?
+
+### Who caught the monsters?
+
+### Who captured the monsters?
+
+### Who unmasked the monsters?
+
+### Which characters got the most scooby snacks?
+
+### What percent of monsters got away?
+
+Were not captured?
+
+# Tidy Data
+
+# Plot Data
