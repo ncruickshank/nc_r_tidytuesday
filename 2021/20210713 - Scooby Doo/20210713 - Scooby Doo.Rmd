@@ -38,36 +38,42 @@ This weeks [Tidy Tuesday](https://github.com/rfordatascience/tidytuesday/tree/ma
 >
 > If you plan to use this data for anything school/entertainment related you are free to (credit is always welcome).
 
-# Exploratory Data Analysis
+Notebook can be viewed by pasting the github URL to this document into https://nbviewer.jupyter.org/.
 
 ```{r}
 scoobydoo %>% head(5)
 ```
 
 ```{r}
-# tidy data 
-
-```
-
-```{r}
 # values
 color_scheme1 <- c(
-  "#228B22",# aka forest green (Best)
+  "#228B22", # aka forest green (Best)
   "#98FB98", # aka pale green (Top 3)
   "#D3D3D3", # aka light grey (Other)
   "#FFB6C1", # aka light pink (Bottom 3)
   "#DC143C" # aka crimson (Worst)
   )
+
+color_scheme2 <- c(
+  "#228B22", # aka forest green (Great)
+  "#98FB98", # aka pale green (OK)
+  "#FFB6C1", # aka light pink (Meh)
+  "#DC143C" # aka crimson (Worst)
+  )
+
+the_gang <- c("Fred", "Daphnie", "Velma", "Shaggy", "Scooby")
 ```
 
+# IMDb Time Series Analysis
 
-## IMDb Time Series
-
-### Series
+## By Series
 
 ```{r}
 ## get summary info for each season
 series_info <- scoobydoo %>%
+  filter(
+    !(season %in% c("Movie", "Special"))
+  ) %>%
   mutate(
     year = year(date_aired),
     imdb = as.double(imdb),
@@ -121,13 +127,12 @@ series_info %>%
     xaxis = list(title = 'Sequential Series Number', showticklabels = FALSE),
     yaxis = list(title = 'Mean IMDb Score'),
     legend = list(orientation = 'h', y = -0.3),
-    width = 800,
+    width = 900,
     height = 400
   )
 ```
 
-
-### Seasons
+## By Seasons
 
 ```{r}
 ## get summary info for each season
@@ -187,13 +192,13 @@ season_info %>%
     xaxis = list(title = 'Sequential Season Number', showticklabels = FALSE),
     yaxis = list(title = 'Mean IMDb Score'),
     legend = list(orientation = 'h', y = -0.3),
-    width = 800,
+    width = 900,
     height = 400
   )
 ```
 
 
-### Episodes
+## By Episodes
 
 ```{r scooby imdb timeline, fig.height=5, fig.width=10}
 scoobydoo %>%
@@ -220,31 +225,372 @@ scoobydoo %>%
     title = 'IMDb scores of Scooby Doo episodes over time',
     xaxis = list(title = 'Episode Index (according to Scoobypedia)'),
     yaxis = list(title = 'IMDb Score'),
-    width = 800,
+    width = 900,
     height = 400,
     legend = list(orientation = 'h', y = -0.3)
   )
 ```
 
-## Monsters 
+# Monsters 
 
-### Distribution of Gender
+```{r}
+# collapse columns
+monsters <- scoobydoo %>%
+  mutate(
+    # caught
+    caught_fred = str_replace(caught_fred, "TRUE", "Fred"),
+    caught_daphnie = str_replace(caught_daphnie, "TRUE", "Daphnie"),
+    caught_velma = str_replace(caught_velma, "TRUE", "Velma"),
+    caught_shaggy = str_replace(caught_shaggy, "TRUE", "Shaggy"),
+    caught_scooby = str_replace(caught_scooby, "TRUE", "Scooby"),
+    
+    # captured
+    captured_fred = str_replace(captured_fred, "TRUE", "Fred"),
+    captured_daphnie = str_replace(captured_daphnie, "TRUE", "Daphnie"),
+    captured_velma = str_replace(captured_velma, "TRUE", "Velma"),
+    captured_shaggy = str_replace(captured_shaggy, "TRUE", "Shaggy"),
+    captured_scooby = str_replace(captured_scooby, "TRUE", "Scooby"),
+    
+    # unmasked
+    unmask_fred = str_replace(unmask_fred, "TRUE", "Fred"),
+    unmask_daphnie = str_replace(unmask_daphnie, "TRUE", "Daphnie"),
+    unmask_velma = str_replace(unmask_velma, "TRUE", "Velma"),
+    unmask_shaggy = str_replace(unmask_shaggy, "TRUE", "Shaggy"),
+    unmask_scooby = str_replace(unmask_scooby, "TRUE", "Scooby"),
+  )
+```
 
-### Distribution By Type
+## Who caught the monsters?
 
-And subtype?
+```{r}
+# tidy data frame for monsters caught
+caught_df <- monsters
+caught_df$caught_by <- apply(caught_df %>% select(starts_with("caught_")), 1, function(x) paste(x[x != "FALSE" & x != "NULL"], collapse = ","))
+caught_df$caught_by[is.na(caught_df$caught_by)] <- "Not Caught"
+caught_df <- caught_df %>%
+  separate_rows(caught_by, sep = ",") %>%
+  filter(
+    caught_by %in% the_gang
+  )
+```
 
-Or Species?
+```{r}
+# table of most catches
+count(caught_df, caught_by) %>%
+  arrange(desc(n))
+```
 
-### Who caught the monsters?
+```{r}
+# plot the relationship over time
+caught_df2 <- caught_df %>%
+  mutate(
+    year = year(date_aired),
+    real = ifelse(monster_real == "TRUE", "Real", "Fake"),
+    monster_details = paste0(monster_name, " (", real, " Monster(s)) in '", title, "' on ", date_aired, ".")
+  ) %>%
+  group_by(year, caught_by) %>%
+  dplyr::summarise(
+    n = n(),
+    caught_names = paste(monster_details, collapse = "\n")
+  )
 
-### Who captured the monsters?
+plot_monsters_caught <- function(gang_member, df = caught_df2) {
+  fig <- df %>%
+    filter(caught_by == gang_member) %>%
+    plot_ly(
+      type = 'bar',
+      x = ~year,
+      y = ~n,
+      text = ~paste0("<b>Monsters Caught</b><br><br>",
+                     caught_names),
+      showlegend = FALSE
+    ) %>%
+    layout(
+      xaxis = list(
+        showline = TRUE,
+        showticklabels = FALSE,
+        mirror = "ticks",
+        linecolor = toRGB("black"),
+        linewidth = 2,
+        range = c(min(caught_df2$year), max(caught_df2$year))
+      ),
+      yaxis = list(
+        title = ~paste0("<b>", gang_member, "</b>"),
+        showline = TRUE,
+        mirror = "ticks",
+        linecolor = toRGB("black"),
+        linewidth = 2,
+        range = c(min(caught_df2$n), max(caught_df2$n) + 1)
+      )
+    )
+  
+  fig
+}
 
-### Who unmasked the monsters?
+subplot(
+  plot_monsters_caught("Fred"),
+  plot_monsters_caught("Daphnie"),
+  plot_monsters_caught("Velma"),
+  plot_monsters_caught("Shaggy"),
+  plot_monsters_caught("Scooby"),
+  nrows = length(the_gang),
+  shareX = FALSE,
+  shareY = FALSE,
+  titleX = FALSE,
+  titleY = TRUE
+) %>%
+  layout(
+    mode = 'lines+markers',
+    title = '<b><i>Monsters Captured Annualy By...</i></b>',
+    width = 900,
+    height = 600,
+    legend = list(orientation = 'h')
+  )
+```
 
-### What percent of monsters got away?
 
-Were not captured?
+## Who was captured by monsters the most?
 
-## Which characters got the most scooby snacks?
+```{r}
+# tidy data frame for captured by the monster
+captured_df <- monsters
+captured_df$captured <- apply(captured_df %>% select(starts_with("captured_")), 1, function(x) paste(x[x != "FALSE" & x != "NULL"], collapse = ","))
+#captured$captured_by[is.na(captured$caught_by)] <- "Not Caught"
+captured_df <- captured_df %>%
+  separate_rows(captured, sep = ",") %>%
+  filter(
+    captured %in% the_gang
+  )
+```
 
+```{r}
+count(captured_df, captured) %>%
+  arrange(desc(n))
+```
+
+```{r}
+# plot the relationship
+captured_df2 <- captured_df %>%
+  mutate(
+    year = year(date_aired),
+    real = ifelse(monster_real == "TRUE", "Real", "Fake"),
+    monster_details = paste0(monster_name, " (", real, " Monster(s)) in '", title, "' on ", date_aired, ".")
+  ) %>%
+  group_by(year, captured) %>%
+  dplyr::summarise(
+    n = n(),
+    captured_details = paste(monster_details, collapse = "\n")
+  )
+
+plot_monsters_captures <- function(gang_member, df = captured_df2) {
+  fig <- df %>%
+    filter(captured == gang_member) %>%
+    plot_ly(
+      type = 'bar',
+      x = ~year,
+      y = ~n,
+      text = ~paste0("<b>Captured By...</b><br><br>",
+                     captured_details),
+      showlegend = FALSE
+    ) %>%
+    layout(
+      xaxis = list(
+        showline = TRUE,
+        showticklabels = FALSE,
+        mirror = "ticks",
+        linecolor = toRGB("black"),
+        linewidth = 2,
+        range = c(min(captured_df2$year), max(captured_df2$year))
+      ),
+      yaxis = list(
+        title = ~paste0("<b>", gang_member, "</b>"),
+        showline = TRUE,
+        mirror = "ticks",
+        linecolor = toRGB("black"),
+        linewidth = 2,
+        range = c(min(captured_df2$n), max(captured_df2$n) + 1)
+      )
+    )
+  
+  fig
+}
+
+subplot(
+  plot_monsters_captures("Fred"),
+  plot_monsters_captures("Daphnie"),
+  plot_monsters_captures("Velma"),
+  plot_monsters_captures("Shaggy"),
+  plot_monsters_captures("Scooby"),
+  nrows = length(the_gang),
+  shareX = FALSE,
+  shareY = FALSE,
+  titleX = FALSE,
+  titleY = TRUE
+) %>%
+  layout(
+    mode = 'lines+markers',
+    title = '<b><i>Jinkies! ... has been captured by the monster!</i></b>',
+    width = 900,
+    height = 600,
+    legend = list(orientation = 'h')
+  )
+```
+
+## Who unmasked the most monsters?
+
+```{r}
+# tidy data frame for captured by the monster
+unmasked_df <- monsters
+unmasked_df$unmasked_by <- apply(unmasked_df %>% select(starts_with("unmask_")), 1, function(x) paste(x[x != "FALSE" & x != "NULL"], collapse = ","))
+unmasked_df$unmasked_by[is.na(unmasked_df$unmasked_by)] <- "Not Unmasked"
+unmasked_df <- unmasked_df %>%
+  separate_rows(unmasked_by, sep = ",") %>%
+  filter(
+    unmasked_by %in% the_gang
+  )
+```
+
+```{r}
+count(unmasked_df, unmasked_by) %>%
+  arrange(desc(n))
+```
+
+```{r}
+# plot the relationship
+unmasked_df2 <- unmasked_df %>%
+  mutate(
+    year = year(date_aired),
+    real = ifelse(monster_real == "TRUE", "Real", "Fake"),
+    monster_details = paste0(monster_name, " (", real, " Monster(s)) in '", title, "' on ", date_aired, ".")
+  ) %>%
+  group_by(year, unmasked_by) %>%
+  dplyr::summarise(
+    n = n(),
+    unmask_details = paste(monster_details, collapse = "\n")
+  )
+
+plot_monsters_unmasks <- function(gang_member, df = unmasked_df2) {
+  fig <- df %>%
+    filter(unmasked_by == gang_member) %>%
+    plot_ly(
+      type = 'bar',
+      x = ~year,
+      y = ~n,
+      text = ~paste0("<b>Unmasked By...</b><br><br>",
+                     unmask_details),
+      showlegend = FALSE
+    ) %>%
+    layout(
+      xaxis = list(
+        showline = TRUE,
+        showticklabels = FALSE,
+        mirror = "ticks",
+        linecolor = toRGB("black"),
+        linewidth = 2,
+        range = c(min(unmasked_df2$year), max(unmasked_df2$year))
+      ),
+      yaxis = list(
+        title = ~paste0("<b>", gang_member, "</b>"),
+        showline = TRUE,
+        mirror = "ticks",
+        linecolor = toRGB("black"),
+        linewidth = 2,
+        range = c(min(unmasked_df2$n), max(unmasked_df2$n) + 1)
+      )
+    )
+  
+  fig
+}
+
+subplot(
+  plot_monsters_unmasks("Fred"),
+  plot_monsters_unmasks("Daphnie"),
+  plot_monsters_unmasks("Velma"),
+  plot_monsters_unmasks("Shaggy"),
+  plot_monsters_unmasks("Scooby"),
+  nrows = length(the_gang),
+  shareX = FALSE,
+  shareY = FALSE,
+  titleX = FALSE,
+  titleY = TRUE
+) %>%
+  layout(
+    mode = 'lines+markers',
+    title = '<b><i>Monsters Unmasked Annualy By...</i></b>',
+    width = 900,
+    height = 600,
+    legend = list(orientation = 'h')
+  )
+```
+
+## What monster types are most likely to get away?
+
+```{r}
+n_not_caught <- nrow(filter(scoobydoo, caught_not == "TRUE"))
+got_away_rate <- paste0(round(100 * (n_not_caught / nrow(scoobydoo)), 2), "%")
+```
+
+First of all, the monster(s) got away at the end of only `r n_not_caught` out of `r nrow(scoobydoo)` episodes (rate of `r got_away_rate`). Of those `r n_not_caught`, the following breaks down the success rate by monster type.
+
+```{r}
+escape_stats <- scoobydoo %>%
+  filter(caught_not == "TRUE") %>%
+  # looks like there were a few mispellings
+  mutate(monster_type = ifelse(str_detect(monster_type, "(Disguised|Disguised|Disugised)"), "Disguised", monster_type)) %>%
+  separate_rows(monster_type, sep = ",") %>%
+  group_by(monster_type) %>%
+  dplyr::summarise(
+    n_escaped = n(),
+    mean_imdb_escaped = mean(as.double(imdb))
+  )
+
+imdb_effect_categories <- c(
+  "Better Than Average Episode",
+  "Slightly Better Than Average Episode",
+  "Slightly Worse Than Average Episode",
+  "Worse Than Average Episode"
+)
+
+escape_stats2 <- scoobydoo %>%
+  mutate(monster_type = ifelse(str_detect(monster_type, "(Disguised|Disguised|Disugised)"), "Disguised", monster_type)) %>%
+  separate_rows(monster_type, sep = ",") %>%
+  filter(imdb != "NULL") %>%
+  group_by(monster_type) %>%
+  dplyr::summarise(
+    n_total = n(),
+    mean_imdb = mean(as.double(imdb))
+  ) %>%
+  inner_join(escape_stats) %>%
+  mutate(
+    escape_rate = round(100 * (n_escaped / n_total)),
+    escape_imdb_effect = mean_imdb_escaped - mean_imdb,
+    imdb_effect_category = case_when(
+      escape_imdb_effect < -1 ~ "Worse Than Average Episode",
+      escape_imdb_effect < 0 ~ "Slightly Worse Than Average Episode",
+      escape_imdb_effect < 1 ~ "Slightly Better Than Average Episode",
+      escape_imdb_effect >= 1 ~ "Better Than Average Episode"
+    ),
+    imdb_effect_category = factor(imdb_effect_category, levels = imdb_effect_categories)
+  )
+
+escape_stats2 %>%
+  plot_ly(
+    type = 'bar',
+    x = ~fct_reorder(monster_type, escape_rate, .desc = TRUE),
+    y = ~escape_rate,
+    color = ~imdb_effect_category,
+    colors = color_scheme2,
+    text = ~paste0("<b>", monster_type, "</b><br><br>", 
+                   "Escaped ", n_escaped, " out of ", n_total, " episodes.<br>",
+                   "Average Episode IMDb Score (All): ", round(mean_imdb, 1), "<br>",
+                   "Average Episode IMDb Score (Escaped): ", round(mean_imdb_escaped, 1))
+  ) %>%
+  layout(
+    title = 'How often do Scooby Doo monsters go uncaught, and how does that affect the episode?',
+    xaxis = list(title = "Monster Type"),
+    yaxis = list(title = "Escape Rate (%)"),
+    legend = list(orientation = 'h', y = -0.3),
+    width = 900,
+    height = 500
+  )
+```
