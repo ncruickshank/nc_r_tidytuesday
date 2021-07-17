@@ -1,0 +1,332 @@
+---
+title: "20210608 - Fishing"
+author: "Nick Cruickshank"
+date: "6/8/2021"
+output: github_document
+---
+
+![Great lakes map](https://www.freeworldmaps.net/united-states/great-lakes/great-lakes-map.jpg)
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning=FALSE)
+```
+
+```{r}
+# libraries
+library(cowplot)
+library(forcats)
+library(readr)
+library(shadowtext) # for white text with black outline
+library(tidytext)
+library(tidyverse)
+library(zoo) # for rolling means
+```
+
+```{r}
+# data
+fishing <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-06-08/fishing.csv')
+stocked <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-06-08/stocked.csv')
+```
+
+Information regarding the Tidy Tuesday project can be found at [this Github repository](https://github.com/rfordatascience/tidytuesday/tree/master/data/2021/2021-06-08). The data comes from the [Great Lakes Fishery Commission](http://www.glfc.org/great-lakes-databases.php). Full detailson the data can be found on their [static notes](http://www.glfc.org/commercial/COMMERCIAL%20FISH%20PRODUCTION_Notes%20on%20Statistics.pdf) and [background notes](http://www.glfc.org/commercial/COMMERCIAL%20FISH%20PRODUCTION_background.pdf).
+
+> Commercial fish catch data (called production) were published by the Great Lakes Fishery Commission in 1962 (Technical Report No.3) and covered the period 1867-1960. A supplement covering the years 1961-1968 was released in 1970, and a revised edition covering the years 1867-1977 was published in 1979. This third update of a web-based version covers the period 1867-2015. The intent is to update at approximately five-year intervals. The files are intended for open use by the public. We ask only that the commission be acknowledged when these records are used in presentations and publications.
+
+```{r}
+# functions
+Mode <- function(x) {
+  ux <- unique(x)
+  ux[which.max(tabulate(match(x, ux)))]
+}
+```
+
+# Tidying the datasets and exploratory analysis
+
+```{r}
+knitr::kable(head(fishing),
+             align = 'c',
+             caption = "First six rows of the fishing dataset")
+```
+
+
+Why are "Total Canada (ONT)", "U.S. Total (MI)", and others included in this dataset?
+
+```{r fig.height=4, fig.width=8}
+fishing %>%
+  group_by(region) %>%
+  dplyr::summarise(
+    sum_grand_total = sum(grand_total, na.rm = TRUE),
+    sum_values = sum(values, na.rm = TRUE)) %>%
+  mutate(category = ifelse(str_detect(region, "Total"), "total", "not total")) %>%
+  ggplot(aes(fct_reorder(region, sum_values), sum_values)) +
+  geom_bar(aes(fill = category), stat = "identity") + 
+  coord_flip() + 
+  labs(
+    title = "Why are there 'total' regions in the dataset?",
+    subtitle = "Are there double counts?",
+    x = ""
+  ) + 
+  theme(
+    legend.position = "none"
+  )
+```
+
+I think we can cut the following regions: 'U.S. Total', 'Canada (ONT)', 'WI State Total', 'MI State Total', and 'U.S. Total (MI)'. 'Total Canada (ONT)' looks like a fishy name (pun intended), but the actual count looks more legitimate than 'Canada (ONT)'.  
+
+Preliminary exploratory analysis revealed that the species "cisco" and "chub" were sometimes combined to "cisco and chub" or "cisco and chubs". Easiest way to handle this was to just combine all instances of "cisco" and "chub" into the overarching group "cisco and "chub" (as well as unifying the pluralization). This phase of the project also revealed that the `lake` Saint Clair was vastly underrepresented in the `fishing` dataset. Further, it kind of throws off the narrative of comparing the five great lakes. As such, it was filtered out.
+
+```{r}
+# tidy daya
+fish_df <- fishing %>%
+  filter(
+    lake != "Saint Clair"
+  ) %>%
+  mutate(
+    species = str_to_lower(species),
+    species = ifelse(species %in% c("chubs", "cisco", "cisco and chubs"), "cisco and chub", species)
+  )
+
+fishing_top_species_df <- fish_df %>%
+  group_by(lake, species) %>%
+  dplyr::summarise(
+    sum_values = sum(values, na.rm = TRUE)
+  ) %>%
+  top_n(5, sum_values) %>%
+  arrange(lake, desc(sum_values)) 
+
+top_fish_list <- unique(fishing_top_species_df$species)
+```
+
+# Fishing Data Infographic
+
+## First Row of Plots: Fishing Industry Evaluation
+
+```{r}
+# fishing industry evaluation row
+fish_decades_df <- fish_df %>%
+  mutate(
+    decade = year - year %% 10
+    ) %>%
+  group_by(lake, decade) %>%
+  dplyr::summarise(mode_fish = Mode(species))
+
+fish_industry_yearly_plot <- fish_df %>%
+  group_by(year, lake) %>%
+  dplyr::summarise(
+    sum_values = sum(values, na.rm = TRUE)
+  ) %>%
+  mutate(decade = year - year %% 10) %>%
+  ggplot(aes(year, sum_values), color = "royalblue4") + 
+  geom_area(aes(fill = lake), direction = -1) +
+  scale_fill_brewer() +
+  facet_wrap(~ lake, scales = "free_y", ncol = 5) +
+  labs(
+    title = "Is the Great Lakes fishing industry in a state of decline, or has the distribution of available species shifted?\n"
+  ) + 
+  theme_void() + 
+  theme(
+    legend.position = "none"
+  )
+
+fish_industry_decades_plot <- fish_decades_df %>%
+  ggplot(aes(decade, 1)) + 
+  geom_bar(aes(fill = mode_fish), stat = "identity", position = "fill", color = "gray20", width = 10) + 
+  scale_fill_brewer(palette = "Dark2", direction = -1) +
+  facet_wrap(~ lake, ncol = 5) + 
+  labs(fill = "Most common species\ncaught per decade") +
+  theme_void() + 
+  theme(
+    strip.background = element_blank(),
+    strip.text.x = element_blank(),
+    legend.position = "bottom"
+  )
+
+industry_big_picture_plots <- plot_grid(fish_industry_yearly_plot, fish_industry_decades_plot, ncol = 1, rel_heights = c(4,1))
+```
+
+## Second Row of Plots: Fish Pie Distribution
+
+```{r}
+# top row of plots
+## fish pie distribution
+fish_pie <- fish_df %>%
+  filter(
+    species %in% top_fish_list,
+    !(is.na(values))
+  ) %>%
+  group_by(lake) %>%
+  dplyr::summarise(totals = sum(values, na.rm = TRUE))
+
+fish_pie <- fish_pie %>%
+  arrange(desc(lake)) %>% 
+  mutate(
+    prop = totals / sum(fish_pie$totals) * 100,
+    ypos = cumsum(prop) - 0.5*prop
+  )
+
+fish_pie_plot <- fish_pie %>%
+  ggplot(aes(x = "", y = prop, fill = lake)) + 
+  geom_bar(stat = "identity", width = 1, color = "white") + 
+  coord_polar("y", start = 0) + 
+  labs(
+    title = "Distribution of production by lake"
+  ) +
+  theme_void() + 
+  theme(
+    legend.position = "none",
+    plot.title = element_text(hjust = 0.5)
+    ) + 
+  geom_shadowtext(aes(y = ypos, label = lake), color = "white", size = 6) + 
+  scale_fill_brewer(direction = -1)
+
+## fish violin species distribution
+fish_violins_df <- fish_df %>%
+  filter(
+    species %in% top_fish_list,
+    !(is.na(values))
+  ) %>%
+  group_by(year, species) %>%
+  dplyr::summarise(
+    yearly_values = sum(values)
+  ) 
+
+fish_violin_means <- fish_violins_df %>%
+  group_by(species) %>%
+  dplyr::summarise(mean_value = round(mean(yearly_values)))
+
+fish_violin_plot <- fish_violins_df %>%
+  ggplot(aes(species, yearly_values)) + 
+  geom_violin(aes(fill = species)) + 
+  geom_text(
+    data = fish_violin_means, 
+    aes(x = species, y = 200000, label = paste0("Avg. Yearly Value: ", mean_value))
+    ) +
+  scale_fill_brewer(palette = "Set3") +
+  labs(
+    title = "Distribution of total yearly production values (in thousands of pounds) across all Great Lakes by species",
+    x = "",
+    y = "Value (pounds)"
+  ) +
+  facet_wrap(~ species, scales = "free_x", ncol = 5) +
+  theme_minimal() +
+  theme(
+    legend.position = "none",
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    panel.grid.major.x = element_blank()
+  )
+
+fish_distributions_row <- plot_grid(fish_pie_plot, fish_violin_plot, rel_widths = c(1,3), ncol = 2)
+```
+
+## Third Row of Plots: Time series analysis of top historic fish series
+
+```{r}
+# distribution of fish by lake
+lake_totals_comparison_plot <- fish_df %>%
+  group_by(lake) %>%
+  dplyr::summarise(total_values = sum(values, na.rm = TRUE)) %>%
+  mutate(x = round(total_values / 1000)) %>%
+  ggplot(aes(fct_reorder(lake, lake, .desc = TRUE), -total_values)) + 
+  geom_bar(stat = "identity", fill = "skyblue1", color = "skyblue4") + 
+  geom_text(aes(label = x), hjust = -1) +
+  coord_flip() + 
+  labs(
+    title = "Total values (in millions of pounds) by lake"
+  ) +
+  scale_x_discrete(name = "", position = "top") + 
+  theme_void() +
+  theme(
+    plot.title = element_text(hjust = 0.9)
+  )
+
+# top fish by lake
+top_fish_plot <- fishing_top_species_df %>%
+  ggplot(aes(reorder_within(species, sum_values, lake), sum_values)) + 
+  geom_bar(aes(fill = species), stat = "identity", color = "navy") + 
+  labs(
+    title = "All time top production value species",
+    x = "",
+    y = "Total Value (pounds)"
+  ) +
+  scale_x_reordered() +
+  scale_fill_brewer(palette = "Set3") + 
+  coord_flip() +
+  facet_wrap(~ lake, scales = "free", ncol = 1) + 
+  theme_bw() + 
+  theme(
+    legend.position = "none"
+  )
+
+# time series analysis of top fish by lake
+lake_time_comments <- data.frame(lake = sort(unique(fish_df$lake)),
+           year = 1995,
+           values = c(105000, 50000, 150000, 4500, 70000),
+           comments = c(
+             "Modern day production of top historic species largely
+              represented by 'Yellow Perch' and 'Walleye'.",
+             "In recent years 'Lake Whitefish' has risen in production
+              while all other species have experienced
+              gradual decline.",
+             "Pronounced spike in 'Alewife'
+             production from the
+             1960s to the 1980s.",
+             "'Cisco and chubs' production noticeably dropped around
+             the 1950s. 'Lake Whitefish' were surging in production from
+             the 1920s to the 1930s. 'Yellow Perch' showed a small surge
+             in production from the 1970s through the 1980s",
+             "Pronounced prominence of 'Cisco and Chub' production in the
+             early 1900s followed by a much smaller representation of
+             'Lake Whitefish' in the modern day."
+           ))
+
+## consider modifying the species column to replace all non-top species with "Other"
+## will maybe improve data vis, but will also throw off the brewer palette.
+fish_time_plot <- fish_df %>%
+  filter(
+    species %in% top_fish_list
+  ) %>%
+  #mutate(
+  #  species = ifelse(species %in% top_fish_list, species, "Other")
+  #) %>%
+  ggplot(aes(year, values)) + 
+  geom_bar(aes(group = species, fill = species), stat = "identity") + 
+  geom_text(data = lake_time_comments, aes(x = year, y = values, label = comments), vjust = 1) + 
+  scale_fill_brewer(palette = "Set3") + 
+  labs(
+    title = "Time series analysis of the top fish species",
+    x = "Year",
+    y = "Values (pounds)"
+  ) +
+  facet_wrap(~ lake, ncol = 1, scales = "free") + 
+  theme_bw() + 
+  theme(
+    legend.position = "none"
+  )
+
+top_fish_plots <- plot_grid(top_fish_plot, fish_time_plot, rel_widths = c(1,3), ncol = 2)
+```
+
+## Merge all plots together into infograph
+
+```{r great_lakes_fishing_infographic, fig.height=25, fig.width=20}
+# infographic title
+fish_texts <- ggdraw() + 
+  draw_label(
+    "The Great Lakes! Evaluation of the top 10 species which have yielded the highest values of catch data historically across all five lakes",
+    fontface = "bold", x = 0, hjust = 0, size = 20
+  ) + 
+  theme(
+    plot.margin = margin(0,0,0,7)
+  )
+
+# merge all plot rows together
+all_fish_plots <- plot_grid(industry_big_picture_plots, fish_distributions_row, top_fish_plots, ncol = 1, rel_heights = c(1,1,4))
+
+# merge infographic title with all plots
+historic_species_infographic <- plot_grid(fish_texts, all_fish_plots, ncol = 1, rel_heights = c(0.1, 1))
+
+historic_species_infographic
+```
+
+

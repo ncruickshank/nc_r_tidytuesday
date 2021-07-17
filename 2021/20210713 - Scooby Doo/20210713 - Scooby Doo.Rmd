@@ -1,0 +1,251 @@
+---
+title: "20210713 - Scooby Doo"
+author: "Nick Cruickshank"
+date: "7/14/2021"
+output: 
+  html_document:
+    toc: true
+    keep_md: true
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning=FALSE)
+```
+
+```{r libraries}
+# libraries
+library(forcats)
+library(lubridate)
+library(plotly)
+library(readr)
+library(tidyverse)
+```
+
+```{r}
+# data
+scoobydoo <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-07-13/scoobydoo.csv')
+```
+
+![scooby doo](https://media.avalonhill.wizards.com/styles/second_hubpage_banner/public/images/dynamichubpage/lwclkwcwqcn.jpg)
+
+# Introduction
+
+This weeks [Tidy Tuesday](https://github.com/rfordatascience/tidytuesday/tree/master/data/2021/2021-07-13) dataset comes from [Kaggle](https://www.kaggle.com/williamschooleman/scoobydoo-complete) by way of manual data aggregation from [plummye](https://www.kaggle.com/williamschooleman).
+
+> Every Scooby-Doo episode and movie's various variables.
+>
+> Took ~1 year to watch every Scooby-Doo iteration and track every variable. Many values are subjective by nature of watching but I tried my hardest to keep the data collection consistent.
+>
+> If you plan to use this data for anything school/entertainment related you are free to (credit is always welcome).
+
+# Exploratory Data Analysis
+
+```{r}
+scoobydoo %>% head(5)
+```
+
+```{r}
+# tidy data 
+
+```
+
+```{r}
+# values
+color_scheme1 <- c(
+  "#228B22",# aka forest green (Best)
+  "#98FB98", # aka pale green (Top 3)
+  "#D3D3D3", # aka light grey (Other)
+  "#FFB6C1", # aka light pink (Bottom 3)
+  "#DC143C" # aka crimson (Worst)
+  )
+```
+
+
+## IMDb Time Series
+
+### Series
+
+```{r}
+## get summary info for each season
+series_info <- scoobydoo %>%
+  mutate(
+    year = year(date_aired),
+    imdb = as.double(imdb),
+    engagement = as.double(engagement)
+  ) %>%
+  group_by(series_name, network) %>%
+  dplyr::summarise(
+    series_start = min(date_aired),
+    series_end = max(date_aired),
+    n_episodes = n(),
+    mean_imdb = mean(imdb, na.rm = TRUE),
+    mean_engagement = mean(engagement, na.rm = TRUE)
+  ) %>%
+  ungroup() %>%
+  filter(n_episodes > 1) %>% # filter out movie events
+  arrange(series_start, series_end) %>%
+  mutate(
+    series_id = as.double(row_number())
+  )
+
+series_info <- series_info %>%
+  mutate(
+    ranking = case_when(
+      series_id == head(arrange(series_info, desc(mean_imdb)), 1)$series_id ~ "Best Series",
+      series_id %in% head(arrange(series_info, desc(mean_imdb)), 3)$series_id ~ "Top 3 Series",
+      series_id == head(arrange(series_info, mean_imdb), 1)$series_id ~ "Worst Series",
+      series_id %in% head(arrange(series_info, mean_imdb), 3)$series_id ~ "Bottom 3 Series",
+      TRUE ~ "Other"
+    ),
+    ranking = factor(ranking, levels = c("Best Series", "Top 3 Series", "Other", "Bottom 3 Series", "Worst Series"))
+  )
+```
+
+```{r scooby series imdb timeline}
+# plot series over time
+series_info %>%
+  plot_ly(
+    type = 'bar',
+    mode = 'markers',
+    x = ~series_id,
+    y = ~mean_imdb,
+    color = ~ranking,
+    colors = color_scheme1,
+    text = ~paste0("<b>", series_name, "</b><br>",
+                   "<i>Aired from ", series_start, " to ", series_end, " on ", network, "</i><br><br>",
+                   "Mean IMDb Score: ", round(mean_imdb, 2), " (Number of Reviews: ", round(mean_engagement), ")<br>",
+                   "Episodes: ", n_episodes, "<br>")
+  ) %>%
+  layout(
+    title = 'IMDb Scores for Scooby Doo Series Over Time',
+    xaxis = list(title = 'Sequential Series Number', showticklabels = FALSE),
+    yaxis = list(title = 'Mean IMDb Score'),
+    legend = list(orientation = 'h', y = -0.3),
+    width = 800,
+    height = 400
+  )
+```
+
+
+### Seasons
+
+```{r}
+## get summary info for each season
+season_info <- scoobydoo %>%
+  mutate(
+    year = year(date_aired),
+    imdb = as.double(imdb),
+    engagement = as.double(engagement)
+  ) %>%
+  group_by(series_name, network, season) %>%
+  dplyr::summarise(
+    season_start = min(date_aired),
+    season_end = max(date_aired),
+    n_episodes = n(),
+    mean_imdb = mean(imdb, na.rm = TRUE),
+    mean_engagement = mean(engagement, na.rm = TRUE)
+  ) %>%
+  ungroup() %>%
+  filter(n_episodes > 1 & !(season %in% c("Movie", "Special"))) %>% # filter out movie events
+  arrange(season_start, season_end) %>%
+  mutate(
+    season_id = as.double(row_number())
+  )
+
+season_info <- season_info %>%
+  mutate(
+    ranking = case_when(
+      season_id == head(arrange(season_info, desc(mean_imdb)), 1)$season_id ~ "Best Season",
+      season_id %in% head(arrange(season_info, desc(mean_imdb)), 3)$season_id ~ "Top 3 Season",
+      season_id == head(arrange(season_info, mean_imdb), 1)$season_id ~ "Worst Season",
+      season_id %in% head(arrange(season_info, mean_imdb), 3)$season_id ~ "Bottom 3 Season",
+      TRUE ~ "Other"
+    ),
+    ranking = factor(ranking, levels = c("Best Season", "Top 3 Season", "Other", "Bottom 3 Season", "Worst Season"))
+  )
+```
+
+The average Scooby Doo TV series has `r mean(count(season_info, series_name)$n)` seasons. That's so few!
+
+```{r scooby season imdb timeline}
+# plot season over time
+season_info %>%
+  plot_ly(
+    type = 'bar',
+    mode = 'markers',
+    x = ~season_id,
+    y = ~mean_imdb,
+    color = ~ranking,
+    colors = color_scheme1,
+    text = ~paste0("<b>", series_name, " - Season ", season, "</b><br>",
+                   "<i>Aired from ", season_start, " to ", season_end, " on ", network, "</i><br><br>",
+                   "Mean IMDb Score: ", round(mean_imdb, 2), " (Number of Reviews: ", round(mean_engagement), ")<br>",
+                   "Episodes: ", n_episodes, "<br>")
+  ) %>%
+  layout(
+    title = 'IMDb Scores for Scooby Doo Seasons Over Time',
+    xaxis = list(title = 'Sequential Season Number', showticklabels = FALSE),
+    yaxis = list(title = 'Mean IMDb Score'),
+    legend = list(orientation = 'h', y = -0.3),
+    width = 800,
+    height = 400
+  )
+```
+
+
+### Episodes
+
+```{r scooby imdb timeline, fig.height=5, fig.width=10}
+scoobydoo %>%
+  left_join(series_info, by = c("series_name", "network")) %>%
+    filter(
+    !(is.na(imdb)),
+    imdb != "NULL",
+    engagement != "NULL",
+    !(season %in% c("Movie", "Special"))
+  ) %>%
+  plot_ly(
+    type = 'scatter',
+    mode = 'markers',
+    x = ~index,
+    y = ~imdb,
+    color = ~ranking,
+    colors = color_scheme1,
+    text = ~paste0("<b>", title, "</b><br>",
+                  "<i>Season ", season, " of Series ", series_name, "</i><br><br>",
+                  "Aired ", date_aired, " on ", network, "<br>",
+                  "IMDb Score ", imdb, " (Number of Reviews: ", engagement, ")")
+  ) %>%
+  layout(
+    title = 'IMDb scores of Scooby Doo episodes over time',
+    xaxis = list(title = 'Episode Index (according to Scoobypedia)'),
+    yaxis = list(title = 'IMDb Score'),
+    width = 800,
+    height = 400,
+    legend = list(orientation = 'h', y = -0.3)
+  )
+```
+
+## Monsters 
+
+### Distribution of Gender
+
+### Distribution By Type
+
+And subtype?
+
+Or Species?
+
+### Who caught the monsters?
+
+### Who captured the monsters?
+
+### Who unmasked the monsters?
+
+### What percent of monsters got away?
+
+Were not captured?
+
+## Which characters got the most scooby snacks?
+

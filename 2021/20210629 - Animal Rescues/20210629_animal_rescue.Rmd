@@ -1,0 +1,466 @@
+---
+title: "20210629 - Rescue Animals"
+author: "Nick Cruickshank"
+date: "6/30/2021"
+output: 
+  github_document:
+    toc: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning=FALSE)
+```
+
+```{r}
+# libraries
+library(cowplot)
+library(forcats)
+library(glue)
+library(lubridate)
+library(patchwork)
+library(readr)
+library(tidyverse)
+library(ggtext)
+```
+
+```{r}
+# data
+animal_rescues <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-06-29/animal_rescues.csv')
+```
+
+![image](https://www.desktopbackground.org/p/2014/04/26/753179_friends-cats-birds-dogs-animals-rabbit-hd-wallpapers_1772x1260_h.jpg)
+
+# Introduction
+
+Data this week comes from [London.gov](https://data.london.gov.uk/dataset/animal-rescue-incidents-attended-by-lfb). 
+
+> Fox in bedroom, dog trapped in wall. The London Fire Brigade responds to hundreds of requests to rescue animals each year. Its monthly-updated spreadsheet of such events goes back to 2009; it lists the location and type of property, the kind of animal and rescue, hours spent, a (very) brief description, and more. [h/t Soph Warnes]
+
+Another [article](https://www.theguardian.com/world/2021/jan/08/animal-rescues-london-fire-brigade-rise-2020-pandemic-year) found that animals rescues increased by 20% in the year of the pandemic (2020). 
+
+> The London fire brigade (LFB) was involved in 755 such incidents – more than two a day. The number of rescues rose by 20% compared with 2019 when there were 602, with the biggest rise coming in the number of non-domestic animals rescued, according to the data.
+
+```{r}
+# tidy
+## prominent species
+top_species <- animal_rescues %>%
+  mutate(animal_group_parent = str_to_lower(animal_group_parent)) %>%
+  filter(!(str_detect(animal_group_parent, "unknown"))) %>%
+  count(animal_group_parent) %>%
+  arrange(desc(n)) %>%
+  head(6) # very steep drop off after 6 species
+
+top_species_list <- top_species$animal_group_parent
+top3_species_list <- head(top_species, 3)$animal_group_parent
+
+## final tidy
+ar <- animal_rescues %>%
+  filter(
+    cal_year != 2021 # this year isn't complete, and therefore might throw off visualization
+  ) %>%
+  mutate(
+    animal_group_parent = str_to_lower(animal_group_parent),
+    
+    # time
+    date_time_of_call = as.POSIXct(date_time_of_call, format = "%d/%m/%Y %H:%M"),
+    date = as.Date(date_time_of_call, format = "%d/%m/%Y"),
+    floor_year_month = floor_date(date, "months"),
+    hour_of_day = hour(date_time_of_call),
+    month_day = strftime(date_time_of_call, "%m-%d"),
+    month = strftime(date_time_of_call, format = "%b"),
+    week = week(date_time_of_call),
+    day = day(date_time_of_call),
+    
+    # special service categories
+    special_service_type_category = str_to_lower(special_service_type_category),
+    service_category = str_to_title(str_remove(special_service_type_category, "animal rescue from "))
+  )
+
+unredacted <- ar %>%
+  filter(final_description != "Redacted")
+```
+
+```{r}
+# values
+min_date <- strftime(min(ar$date), format = "%b %d, %Y")
+max_date <- strftime(max(ar$date), format = "%b %d, %Y")
+unique_species <- length(unique(ar$animal_group_parent))
+```
+
+
+```{r}
+# functions
+Mode <- function(x) {
+  ux <- unique(x)
+  ux[which.max(tabulate(match(x, ux)))]
+}
+```
+
+# Exploratory Data Analysis
+
+## Notes
+
+```{r}
+count(ar, cal_year)
+```
+
+
+`type_of_incident`: Only 'Special Service' represented.
+
+`pump` = truck / unit deployed.
+
+```{r eda_call_origin, fig.height=4, fig.width=10}
+count(ar, originof_call) %>%
+  arrange(desc(n))
+```
+
+I don't think there is much insight to be gleaned from whether the call was made from a landline or mobile device.
+
+# Data Visualization Project
+
+## Timeline of animal rescue
+
+```{r overall_rescue_timeline, fig.height=5, fig.width=8}
+ar %>%
+  filter(animal_group_parent %in% top3_species_list) %>%
+  mutate(animal_group_parent = str_to_title(animal_group_parent)) %>%
+  count(floor_year_month, animal_group_parent) %>%
+  ggplot(aes(floor_year_month, n)) + 
+  geom_line() + 
+  facet_wrap(~ animal_group_parent, ncol = 1) + 
+  labs(
+    title = "Number of animal rescues per month",
+    subtitle = "High seasonality observed for birds and cats, not for dogs",
+    x = "Date",
+    y = "Monthly Rescues"
+  )
+```
+
+### Average Year of Animal Rescues
+
+```{r set up plot functions and data}
+ar_monthly_species_mode <- ar %>%
+  filter(
+    animal_group_parent %in% top3_species_list,
+    service_category != "Other Animal Assistance"
+  ) %>%
+  group_by(month, animal_group_parent) %>%
+  dplyr::summarise(mode_service = Mode(service_category))
+
+month_levels <- c("Jan", "Feb", "Mar", "Apr",
+                  "May", "Jun", "Jul", "Aug",
+                  "Sep", "Oct", "Nov", "Dec")
+
+df_duration <- round(as.numeric(difftime(max(ar$date_time_of_call), 
+                                         min(ar$date_time_of_call), 
+                                         unit = "weeks")) / 52.25)
+
+plot_animal_rescue_year_by_species <- function(df = ar, species) {
+  plot_title = paste0(str_to_title(species), "s")
+  
+  plot <- df %>%
+    filter(animal_group_parent == species) %>%
+    group_by(cal_year, month, week, animal_group_parent) %>%
+    dplyr::summarise(n = n()) %>%
+    group_by(month, week, animal_group_parent) %>%
+    dplyr::summarise(
+      avg = mean(n),
+      sd = sd(n),
+      min = min(n),
+      max = max(n)
+    ) %>%
+    left_join(ar_monthly_species_mode) %>%
+    ggplot(aes(week, avg)) +
+    geom_line(aes(color = mode_service), size = 1.5) +
+    geom_point(aes(color = mode_service), size = 3) + 
+    geom_area(aes(fill = mode_service), alpha = 0.75) +
+    scale_color_manual(values = c(
+      "Below Ground"= "burlywood3",
+      "Height" = "lightskyblue1",
+      "Water" = "royalblue"
+    ), drop = FALSE) +
+    scale_fill_manual(values = c(
+      "Below Ground"= "burlywood3",
+      "Height" = "lightskyblue1",
+      "Water" = "royalblue"
+    )) +
+    facet_wrap(~ factor(month, levels = month_levels), ncol = 12, scales = "free_x") + 
+    labs(
+      title = plot_title,
+      x = "",
+      y = "Rescues",
+      fill = "Rescued From (Mode)",
+      color = "Rescued From (Mode)"
+    ) + 
+    theme_dark() + 
+    theme(
+      plot.background = element_rect(fill = "gray50", color = "gray50"),
+      panel.grid.major.x = element_blank(),
+      panel.grid.minor.x = element_blank(),
+      axis.ticks.x = element_blank(),
+      panel.grid.minor.y = element_blank(),
+      axis.text.x = element_blank(),
+      #legend.position = ifelse(species == "dog", "bottom", "none"),
+      legend.position = "none",
+      legend.background = element_rect(fill = "grey50"),
+      plot.title = element_text(hjust = 0.5, size = 14)
+    )
+  
+  plot
+}
+```
+
+```{r Rescues by Species and Service Type in an Average Year, fig.height=8, fig.width=8}
+cat_year <- plot_animal_rescue_year_by_species(ar, "cat")
+bird_year <- plot_animal_rescue_year_by_species(ar, "bird")
+dog_year <- plot_animal_rescue_year_by_species(ar, "dog")
+
+year_plots <- plot_grid(cat_year, bird_year, dog_year,
+                        ncol = 1)
+years_title <- ggdraw() + 
+  draw_label("Average Weekly Rescues", size = 20, fontface = "bold") + 
+  theme(
+    plot.margin = margin(0,0,0,7),
+    plot.background = element_rect(fill = "grey50", color = "grey50")
+  )
+
+year_grid <- plot_grid(years_title, year_plots, ncol = 1, rel_heights = c(0.1,1))
+
+year_grid
+```
+
+
+### Average Day of Animal Rescues
+
+```{r set up functions for hourly plotting}
+ar_hourly_species_mode <- ar %>%
+  filter(
+    animal_group_parent %in% top3_species_list,
+    service_category != "Other Animal Assistance"
+  ) %>%
+  group_by(hour_of_day, animal_group_parent) %>%
+  dplyr::summarise(mode_service = Mode(service_category))
+
+plot_animal_rescues_hourly_by_species <- function(df = ar, species) {
+  df %>%
+    filter(animal_group_parent == species) %>%
+    count(animal_group_parent, cal_year, hour_of_day) %>%
+    group_by(animal_group_parent, hour_of_day) %>%
+    dplyr::summarise(avg = mean(n)) %>%
+    left_join(ar_hourly_species_mode) %>%
+    replace_na(list(mode_service = "Other")) %>%
+    #mutate(species = paste0(str_to_title(animal_group_parent)), "s") %>%
+    ggplot(aes(hour_of_day, avg)) + 
+    geom_bar(aes(fill = mode_service, color = mode_service), alpha = 0.75, stat = "identity", size = 1.5) + 
+    scale_fill_manual(values = c(
+      "Below Ground"= "burlywood3",
+      "Height" = "lightskyblue1",
+      "Water" = "royalblue",
+      "Other" = "gray10"
+    )) + 
+    scale_color_manual(values = c(
+      "Below Ground"= "burlywood3",
+      "Height" = "lightskyblue1",
+      "Water" = "royalblue",
+      "Other" = "gray10"
+    )) + 
+    labs(
+      title = paste0(str_to_title(species), "s"),
+      x = "",
+      y = "",
+      fill = "Rescued From (Mode)",
+      color = "Rescued From (Mode)"
+    ) +
+    facet_wrap(~ hour_of_day, scales = "free_x", ncol = 24) + 
+    theme_dark() + 
+    theme(
+      #legend.position = ifelse(species == "dog", "bottom", "none"),
+      legend.position =  "none",
+      legend.background = element_rect(fill = "grey50"),
+      plot.background = element_rect(fill = "grey50", color = "grey50"),
+      panel.grid.minor.x = element_blank(),
+      panel.grid.major.x = element_blank(),
+      panel.grid.minor.y = element_blank(),
+      axis.ticks.x = element_blank(),
+      axis.text.x = element_blank(),
+      plot.title = element_text(hjust = 0.5, size = 14)
+    )
+}
+```
+
+```{r Rescues by Species and Service Type in an Average Day, fig.height=8, fig.width=8}
+cat_hours <- plot_animal_rescues_hourly_by_species(ar, "cat")
+bird_hours <- plot_animal_rescues_hourly_by_species(ar, "bird")
+dog_hours <- plot_animal_rescues_hourly_by_species(ar, "dog")
+
+hour_plots <- plot_grid(cat_hours, bird_hours, dog_hours, ncol = 1)
+
+hours_title <- ggdraw() + 
+  draw_label("Average Hourly Rescues", fontface = "bold", size = 20) + 
+  theme(
+    plot.margin = margin(0,0,0,0),
+    plot.background = element_rect(fill = "grey50", color = "grey50")
+  )
+
+hour_grid <- plot_grid(hours_title, hour_plots, ncol = 1, rel_heights = c(0.1, 1))
+
+hour_grid
+```
+
+
+### Paste Years and Hours Together
+
+```{r London Animal Rescues Avg Times, fig.height=8, fig.width=16}
+years_hours_plots <- plot_grid(year_grid, hour_grid)
+```
+
+### Top Level Graphics
+
+#### Most represented species
+
+```{r fig.width=3}
+species_bar <- ar %>%
+  mutate(
+    animal_group_parent = ifelse(animal_group_parent %in% top3_species_list, animal_group_parent, "Other"),
+    top3 = ifelse(animal_group_parent %in% top3_species_list, "Top 3", "Other")
+  ) %>%
+  count(animal_group_parent, top3) %>%
+  arrange(desc(n)) %>%
+  ggplot(aes(fct_reorder(animal_group_parent, n), n)) + 
+  geom_bar(aes(fill = top3), stat = "identity", color = "black", alpha = 0.5, size = 2) + 
+  scale_fill_manual(values = c(
+    "Other" = "gray10",
+    "Top 3" = "gray90"
+  )) + 
+  geom_text(aes(y = 50, label = paste0(str_to_title(animal_group_parent), "s")), hjust = "left", fontface = "bold") +
+  coord_flip() + 
+  labs(
+    title = "Count by Species"
+  ) + 
+  theme_void() + 
+  theme(
+    plot.background = element_rect(fill = "gray50", color = "gray50"),
+    plot.title = element_text(hjust = 0.5, size = 14),
+    panel.background = element_rect(fill = "gray50"),
+    legend.position = "none"
+  )
+```
+
+#### Most represented service types
+
+```{r service types bar}
+service_bar <- ar %>%
+  count(service_category) %>%
+  mutate(
+    service_category = ifelse(str_detect(service_category, "Other"), "Other", service_category),
+    relevant_services = ifelse(service_category == "Other", "Other", "Relevant")
+  ) %>%
+  arrange(desc(n)) %>%
+  ggplot(aes(fct_reorder(service_category, n), n)) + 
+  geom_bar(aes(fill = service_category, color = service_category), size = 2, stat = "identity", alpha = 0.5) + 
+  scale_fill_manual(values = c(
+      "Below Ground"= "burlywood3",
+      "Height" = "lightskyblue1",
+      "Water" = "royalblue",
+      "Other" = "gray10"
+    )) + 
+    scale_color_manual(values = c(
+      "Below Ground"= "burlywood3",
+      "Height" = "lightskyblue1",
+      "Water" = "royalblue",
+      "Other" = "gray10"
+    )) + 
+  geom_text(aes(y = 50, label = service_category), hjust = "left", fontface = "bold") + 
+  coord_flip() + 
+  labs(
+    title = "Count by Service Type"
+  ) +
+  theme_void() + 
+  theme(
+    plot.background = element_rect(fill = "gray50", color = "gray50"),
+    plot.title = element_text(hjust = 0.5, size = 14),
+    legend.position = "none"
+  )
+```
+
+
+#### Pie service type by species
+
+```{r animal pies}
+ar_pie <- ar %>%
+  filter(animal_group_parent %in% top3_species_list) %>%
+  count(animal_group_parent, service_category) %>%
+  mutate(
+    service_category = ifelse(str_detect(service_category, "Other"), "Other", service_category)
+  ) 
+
+plot_service_type_pie <- function(df = ar_pie, species) {
+  pie_title <- paste0(str_to_title(species), "s")
+  
+  plot <- df %>%
+    filter(animal_group_parent == species) %>%
+    arrange(desc(service_category)) %>%
+    mutate(
+      prop = n / sum(filter(ar_pie, animal_group_parent == species)$n) * 100,
+      ypos = cumsum(prop) - 0.5*prop,
+      perc = paste0(round(prop, 2), "%")
+    ) %>%
+    ggplot(aes(x = "", y = prop, fill = service_category, color = service_category)) + 
+    geom_bar(width = 1, stat = "identity", alpha = 0.4, size = 2) + 
+    coord_polar("y", start = 0) + 
+    scale_fill_manual(values = c(
+      "Below Ground"= "burlywood3",
+      "Height" = "lightskyblue1",
+      "Water" = "royalblue",
+      "Other" = "gray10"
+    )) + 
+    scale_color_manual(values = c(
+      "Below Ground"= "burlywood3",
+      "Height" = "lightskyblue1",
+      "Water" = "royalblue",
+      "Other" = "gray10"
+    )) + 
+    #geom_text(aes(y = ypos, label = paste0(service_category, "\n", perc)), fontface = "bold") + 
+    labs(
+      title = pie_title
+    ) + 
+    theme_void() + 
+    theme(
+      plot.background = element_rect(fill = "grey50", color = "gray50"),
+      legend.position = "none",
+      plot.title = element_text(hjust = 0.5, size = 14)
+    )
+  
+  plot
+}
+
+cat_pie <- plot_service_type_pie(ar_pie, "cat")
+bird_pie <- plot_service_type_pie(ar_pie, "bird") 
+dog_pie <- plot_service_type_pie(ar_pie, "dog")
+
+pies <- plot_grid(cat_pie, bird_pie, dog_pie, ncol = 3)
+```
+
+#### Patchwork all plots
+
+```{r London Animal Rescues, fig.height=14, fig.width=16}
+# plot_grid(species_bar, service_bar, cat_pie, bird_pie, dog_pie,
+#           ncol = 5, align = "h", axis = "bt")
+(species_bar + service_bar + cat_pie + bird_pie + dog_pie +
+  plot_layout(ncol = 5)) /
+  years_hours_plots + 
+  plot_layout(heights = c(3,13)) + 
+  plot_annotation(
+    title = glue("Animal Rescues in London for the past {df_duration} years"),
+    subtitle = glue("While there were {unique_species} unique species rescued from {min_date} to {max_date}; cats, birds, and dogs made up the majority of those rescues. Aside from 'Other' service types; cats and birds were rescued primarily from height while Dogs had a more even distribution. An average year of rescues features marked seasonality for cats and birds, while dogs appear to be relatively constant throughout the year. Interestingly the service type for dogs changes with the seasons! Perhaps more dogs are falling into frozen lakes in the winter. Finally, most animal rescues occur during waking hours, with water rescues for dogs being concentrated in the late morning hours.\n"),
+    caption = "Source: london.gov (https://data.london.gov.uk/dataset/animal-rescue-incidents-attended-by-lfb)",
+    theme = theme(
+      plot.title = element_text(size = 36, hjust = 0.5),
+      plot.subtitle = element_textbox_simple(size = 16, margin = margin(5,16,7,16), face = "italic", hjust = 0.5, halign = 0.5),
+      plot.caption = element_text(size = 12),
+      plot.background = element_rect(fill = "gray50")
+    )
+  )
+```
+
+
