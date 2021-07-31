@@ -1,0 +1,25 @@
+---
+title: "20210727 - Olympics"
+author: "Nick Cruickshank"
+date: "7/31/2021"
+output: 
+  github_document:
+    toc: true
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# libraries
+library(readr)
+library(tidyverse)
+```
+
+```{r}
+# data
+olympics <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-07-27/olympics.csv')
+```
+
