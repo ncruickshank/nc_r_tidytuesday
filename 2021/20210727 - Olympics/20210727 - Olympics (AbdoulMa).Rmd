@@ -55,7 +55,7 @@ summer_og_editions <- summer_og %>%
     !(year == 1956 & city == "Stockholm")
   ) %>%
   arrange(year) %>%
-  rowid_to_column() # condensed version of mutate(rowid = row_number())
+  rowid_to_column() 
 
 ## compute each federations gold medals number per edition
 gold_medalists <- summer_og %>%
