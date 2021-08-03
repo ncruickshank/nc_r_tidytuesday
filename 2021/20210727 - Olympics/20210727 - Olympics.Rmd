@@ -144,10 +144,9 @@ rus %>%
 ```
 
 - Embellish this plot with historical info at relevant bars   
-   - 1980 (big spike) was held in Moscow, and tons of (Russian) athletes were doping
+   - Originally, Russia submitted a list of 389 athletes for competition. On 7 August 2016, the IOC cleared 278 athletes, and 111 were removed because of the state-sponsored doping scandal.
 - Replace x axis with "City\nYear"
 - Highlight years where the most russian athletes won, label with the sport  
-- Replace x grid with dashed grid for olympic games
 
 # Top Medaling Winter Olympics
 
