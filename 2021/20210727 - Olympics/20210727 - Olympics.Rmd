@@ -17,12 +17,16 @@ knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning=FALSE)
 library(ggtext)
 library(ggstream)
 library(readr)
+library(stringi)
 library(tidyverse)
 ```
 
 ```{r data}
 # data
 olympics <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-07-27/olympics.csv')
+
+olympic_doping <- read_csv("olympic_doping.csv") %>%
+  janitor::clean_names()
 ```
 
 # Ideas for Visualization
@@ -147,6 +151,22 @@ rus %>%
    - Originally, Russia submitted a list of 389 athletes for competition. On 7 August 2016, the IOC cleared 278 athletes, and 111 were removed because of the state-sponsored doping scandal.
 - Replace x axis with "City\nYear"
 - Highlight years where the most russian athletes won, label with the sport  
+
+```{r}
+olympic_doping %>%
+  fill(c(name, country), .direction = "down") %>%
+  filter(str_detect(country, "(Russia|Soviet Union)")) %>%
+  mutate(
+    medal = case_when(
+      str_detect(medals, "gold") ~ "Gold",
+      str_detect(medals, "silver") ~ "Silver",
+      str_detect(medals, "bronze") ~ "Bronze"
+    )
+  ) %>%
+  select(year, city, anti_doping_rule_violation, medal) %>%
+  count(year)
+```
+
 
 # Top Medaling Winter Olympics
 
