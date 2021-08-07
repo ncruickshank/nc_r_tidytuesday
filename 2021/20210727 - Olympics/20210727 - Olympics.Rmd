@@ -155,6 +155,10 @@ dope <- olympic_doping %>%
     )
   ) %>%
   select(year, city, anti_doping_rule_violation, sport, dns, medal)
+
+sort(unique(rus_ath_year$sport))
+
+sort(unique(dope$sport))
 ```
 
 ```{r}
@@ -163,17 +167,35 @@ dope <- olympic_doping %>%
 ## fill with sport
 ## inverted bar chart to be placed below the primary plot
 
-dope
+## need to make the 'dope' sports equal to olympic sports
 
-olympics %>%
+rus_ath_year <- olympics %>%
   filter(
     season == "Summer", 
     str_detect(team, "(Russia|Soviet Union)")
   ) %>%
-  group_by(year) %>%
+  group_by(year) %>% # and by sport if possible
   dplyr::summarise(
     athletes = n_distinct(name)
   )
+
+dope %>%
+  count(year, city) %>% # and by sport if possible 
+  inner_join(rus_ath_year) %>%
+  mutate(prop = 100 * (n / athletes)) %>%
+  ggplot(aes(year, -prop)) + 
+  geom_col(fill = "dodgerblue") + 
+  scale_y_continuous(name = NULL, labels = function(x) paste0(abs(x), "%")) + 
+  coord_cartesian(xlim = c(1896,2016)) + 
+  theme(
+    plot.background = element_rect(fill = "firebrick4"),
+    panel.background = element_rect(fill = "firebrick4"),
+    panel.grid = element_blank(),
+    axis.text.y = element_text(color = "white", size = 15),
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank(),
+  )
+
 ```
 
 ```{r}
