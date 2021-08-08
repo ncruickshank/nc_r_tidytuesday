@@ -16,6 +16,7 @@ knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning=FALSE)
 # libraries
 library(ggtext)
 library(ggstream)
+library(patchwork)
 library(readr)
 library(stringi)
 library(tidyverse)
@@ -79,8 +80,8 @@ summer_og_editions <- olympics %>%
 ```
 
 ```{r Russian Medals by Blood Doping, fig.height=7, fig.width=18}
-label_segment <- tibble(x = c(1956, 2008),
-                        xend = c(1970, 2018),
+label_segment <- tibble(x = c(1956, 2002),
+                        xend = c(1970, 2022),
                         y = c(72, 52),
                         yend = c(72, 52))
 
@@ -89,7 +90,7 @@ label_arrows <- tibble(x = c(1970, 2016),
                        y = c(72, 52),
                        yend = c(83, 43))
 
-rus %>%
+medal_plot <- rus %>%
   pivot_longer(cols = c("gold", "non_gold")) %>% #c("gold", "silver", "bronze")
   mutate(
     ratio = 100 * (value / athletes),
@@ -120,10 +121,7 @@ rus %>%
   annotate(geom = "text", x = 1960, y = 95, label = "The Chemists' Games", fontface = "bold", color = "white", size = 4.5) + 
   annotate(geom = "text", x = 1960, y = 83, label = "No athletes caught during the games.\nAdditional testing afterwards using new\ntechniques revealed 20% of specimens would\nhave resulted in disciplinary action.\nFirst documented case of blood doping.", color = "white") +
   annotate(geom = "text", x = 2012, y = 60, label = "38% of Russian atheletes submitted\nfor competition were rejected due\nto state-sponsored doping scandal", color = "white", size = 4.5) +
-  labs(
-    caption = "**Source:** sports-reference.com & Kaggle  |  **More Info:** en.wikipedia.org/wiki/Doping_at_the_Olympic_Games  |  **Visualization By:** Nick Cruickshank"
-  ) +
-  coord_cartesian(ylim = c(-10, 100)) +
+  coord_cartesian(xlim = c(1896, 2024), ylim = c(-10, 100)) +
   scale_x_continuous(name = NULL) +
   scale_y_continuous(name = NULL, labels = function(x) paste0(x, "%")) +
   theme(
@@ -136,6 +134,8 @@ rus %>%
     axis.ticks.x = element_blank(),
     plot.caption = element_markdown(color = "white", size = 12)
   )
+
+medal_plot
 ```
 
 - Embellish this plot with historical info at relevant bars   
@@ -155,10 +155,6 @@ dope <- olympic_doping %>%
     )
   ) %>%
   select(year, city, anti_doping_rule_violation, sport, dns, medal)
-
-sort(unique(rus_ath_year$sport))
-
-sort(unique(dope$sport))
 ```
 
 ```{r}
@@ -179,14 +175,20 @@ rus_ath_year <- olympics %>%
     athletes = n_distinct(name)
   )
 
-dope %>%
+dope_plot <- dope %>%
   count(year, city) %>% # and by sport if possible 
   inner_join(rus_ath_year) %>%
   mutate(prop = 100 * (n / athletes)) %>%
   ggplot(aes(year, -prop)) + 
   geom_col(fill = "dodgerblue") + 
+  geom_text(aes(label = paste0(round(prop, 1), "%")), color = "white", face = "bold", vjust = 1) +
+  # title
+  annotate(geom = "text", x = 1992, y = -10, label = "Percent of atheltes\ncaught doping", color = "white", fontface = "bold", size = 8) +
+  # subtitle
+  annotate(geom = "text", x = 1992, y = -22, label = "(not all athletes who were\ncaught doping won a medal)", fontface = "italic", color = "white", size = 5) +
   scale_y_continuous(name = NULL, labels = function(x) paste0(abs(x), "%")) + 
-  coord_cartesian(xlim = c(1896,2016)) + 
+  coord_cartesian(xlim = c(1896, 2024), ylim = c(-30, 0)) +
+  scale_x_continuous(name = NULL) +
   theme(
     plot.background = element_rect(fill = "firebrick4"),
     panel.background = element_rect(fill = "firebrick4"),
@@ -196,6 +198,8 @@ dope %>%
     axis.ticks.x = element_blank(),
   )
 
+
+dope_plot
 ```
 
 ```{r}
@@ -207,10 +211,19 @@ dope %>%
 # pie chart of which sports had the most dopers
 ```
 
+```{r main plot, fig.height=10, fig.width=18}
+caption <- "**Source:** sports-reference.com & Kaggle  |  **More Info:** en.wikipedia.org/wiki/Doping_at_the_Olympic_Games  |  **Visualization By:** Nick Cruickshank"
+
+medal_plot /
+  dope_plot +
+  plot_layout(heights = c(10,3))
+
+```
+
 
 # Top Medaling Winter Olympics
 
-- Try grouping by event to count the numnber of events with medalss
+- Try grouping by event to count the numnber of events with medals
 
 ```{r}
 olympics %>%
