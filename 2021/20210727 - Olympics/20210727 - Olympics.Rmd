@@ -18,6 +18,7 @@ library(ggtext)
 library(ggstream)
 library(patchwork)
 library(readr)
+library(readxl)
 library(stringi)
 library(tidyverse)
 ```
@@ -26,7 +27,7 @@ library(tidyverse)
 # data
 olympics <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-07-27/olympics.csv')
 
-olympic_doping <- read_csv("olympic_doping.csv") %>%
+olympic_doping <- read_excel("olympic_doping.xlsx") %>%
   janitor::clean_names()
 ```
 
@@ -40,9 +41,7 @@ olympic_doping <- read_csv("olympic_doping.csv") %>%
    - Be sure to replace 'Soviet Union' with 'Russia'
 - Distributions of Weights and/or Heights by Sport
 
-
 # Gold Medal Proportions
-
 
 # Russian Blood Doping
 
@@ -134,8 +133,6 @@ medal_plot <- rus %>%
     axis.ticks.x = element_blank(),
     plot.caption = element_markdown(color = "white", size = 12)
   )
-
-medal_plot
 ```
 
 - Embellish this plot with historical info at relevant bars   
@@ -197,15 +194,43 @@ dope_plot <- dope %>%
     axis.text.x = element_blank(),
     axis.ticks.x = element_blank(),
   )
-
-
-dope_plot
 ```
 
 ```{r}
 # pie chart of which drugs used by dopers
 ## will likely need to tidy 'anti_doping_rule_violation' column and separate_rows()
+rus_drugs <- dope %>%
+  filter(!(is.na(anti_doping_rule_violation))) %>%
+  mutate(
+    anti_doping_rule_violation = str_remove(anti_doping_rule_violation, "\\s*\\([^\\)]+\\)")
+  ) %>%
+  separate_rows(anti_doping_rule_violation, sep = "(,|&|\\sor |\\sand)") %>%
+  mutate(anti_doping_rule_violation = str_trim(anti_doping_rule_violation))
+  
+# get the most common drugs
+top_drugs <- rus_drugs %>%
+  count(anti_doping_rule_violation, sort = TRUE) %>%
+  head(3) %>%
+  pull(anti_doping_rule_violation)
+
+rus_drugs2 <- rus_drugs %>%
+  mutate(
+    drug = fct_other(anti_doping_rule_violation, keep = top_drugs, other_level = "Other"),
+    drug = str_to_title(drug)
+  )
+
+drug_pie <- rus_drugs2 %>%
+  count(drug, sort = TRUE) %>%
+  ggplot(aes(x = "", y = n, fill = drug)) + 
+  geom_col() + 
+  scale_fill_brewer() + 
+  coord_polar("y", start = 0) + 
+  labs(
+    fill = "Drug"
+  ) +
+  theme_void()
 ```
+
 
 ```{r}
 # pie chart of which sports had the most dopers
@@ -216,7 +241,16 @@ caption <- "**Source:** sports-reference.com & Kaggle  |  **More Info:** en.wiki
 
 medal_plot /
   dope_plot +
-  plot_layout(heights = c(10,3))
+  plot_layout(heights = c(10,3)) + 
+  plot_annotation(
+    title = "Relationship between Russian Olympic Performance and Blood Doping",
+    caption = caption,
+    theme = theme(
+      plot.background = element_rect(fill = "darkred", color = "darkred"),
+      plot.title = element_text(size = 32, color = "white", face = "bold"),
+      plot.caption = element_textbox(size = 12, color = "white"),
+    )
+  )
 
 ```
 
