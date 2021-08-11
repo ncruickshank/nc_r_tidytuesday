@@ -284,7 +284,7 @@ sport_pie_plot <- sport_pie2 %>%
   )
 ```
 
-```{r main plot, fig.height=10, fig.width=18}
+```{r History of Russian Olympic Doping, fig.height=10, fig.width=18}
 caption <- "**Source:** sports-reference.com & Kaggle  |  **More Info:** en.wikipedia.org/wiki/Doping_at_the_Olympic_Games  |  **Visualization By:** Nick Cruickshank"
 
 medal_plot /
