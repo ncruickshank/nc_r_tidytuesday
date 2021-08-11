@@ -31,18 +31,6 @@ olympic_doping <- read_excel("olympic_doping.xlsx") %>%
   janitor::clean_names()
 ```
 
-# Ideas for Visualization
-
-- Proportion of Gold Medals Over Time
-   - For each year of the olympics, find the proportion of medals for each of the Top X nations  
-   - Include an other stream for not Top X nations  
-- Russian Blood Doping
-   - Do some kind of timeline analysis for Russian athletes  
-   - Be sure to replace 'Soviet Union' with 'Russia'
-- Distributions of Weights and/or Heights by Sport
-
-# Gold Medal Proportions
-
 # Russian Blood Doping
 
 [Wikipedia Page for Blood Doping Scandal](https://en.wikipedia.org/wiki/Doping_in_Russia)
@@ -79,22 +67,22 @@ summer_og_editions <- olympics %>%
 ```
 
 ```{r Russian Medals by Blood Doping, fig.height=7, fig.width=18}
-label_segment <- tibble(x = c(1956, 2002),
-                        xend = c(1970, 2022),
-                        y = c(72, 52),
-                        yend = c(72, 52))
+label_segment <- tibble(x = c(1948, 2002, 1994),
+                        xend = c(1970, 2022, 2010),
+                        y = c(72, 77, 50),
+                        yend = c(72, 77, 50))
 
-label_arrows <- tibble(x = c(1970, 2016),
-                       xend = c(1978, 2016),
-                       y = c(72, 52),
-                       yend = c(83, 43))
+label_arrows <- tibble(x = c(1970, 2016, 2008),
+                       xend = c(1978, 2016, 2008),
+                       y = c(72, 77, 50),
+                       yend = c(83, 43, 34))
 
 medal_plot <- rus %>%
-  pivot_longer(cols = c("gold", "non_gold")) %>% #c("gold", "silver", "bronze")
+  pivot_longer(cols = c("gold", "silver", "bronze")) %>% #c("gold", "silver", "bronze") #c("gold", "non_gold")
   mutate(
     ratio = 100 * (value / athletes),
-    name = factor(name, levels = c("gold", "non_gold"))
-    #name = factor(str_to_title(name), levels = c("Gold", "Silver", "Bronze"))
+    #name = factor(name, levels = c("gold", "non_gold"))
+    name = factor(str_to_title(name), levels = c("Gold", "Silver", "Bronze"))
   ) %>%
   ggplot() + 
   # dashed x grid
@@ -104,28 +92,29 @@ medal_plot <- rus %>%
             angle = 45, lineheight = 0.8, fontface = "bold", color = "white") +
   geom_col(aes(year, ratio, fill = name), color = "grey20") + 
   scale_fill_manual(values = c(
-    "gold" = "gold3",
-    "non_gold" = "gray40"
+    "Gold" = "gold3",
+    "Silver" = "gray60",
+    "Bronze" = "darkgoldenrod4"
   )) + 
   # seqments for pointing out interesting bars
   geom_segment(data = label_segment, aes(x = x, xend = xend, y = y, yend = yend), color = "white") + 
   geom_segment(data = label_arrows, aes(x = x, xend = xend, y = y, yend = yend), color = "white", arrow = arrow(length = unit(2, "mm"))) +
   # title
-  annotate("text", x = 1918, y = 83, label = "Percent of Russian Athletes to Medal", size = 10, fontface = "bold", color = "white") + 
-  annotate("text", x = 1918, y = 73, label = "How did the Russian Blood Doping Scandal\naffect performance?", lineheight = 0.95, size = 8, fontface = "italic", color = "white") +
+  annotate("text", x = 1918, y = 80, label = "Percent of Russian\nAthletes to Medal", size = 10, fontface = "bold", color = "white") + 
   # subtitle
   # notes
   annotate(geom = "text", x = 1916, y = 10, label = "WORLD WAR I\n(1914-1918)", fontface = "bold", size = 5, color = "white") + 
   annotate(geom = "text", x = 1942, y = 10, label = "WORLD WAR II\n(1939-1945)", fontface = "bold", size = 5, color = "white") +
-  annotate(geom = "text", x = 1960, y = 95, label = "The Chemists' Games", fontface = "bold", color = "white", size = 4.5) + 
-  annotate(geom = "text", x = 1960, y = 83, label = "No athletes caught during the games.\nAdditional testing afterwards using new\ntechniques revealed 20% of specimens would\nhave resulted in disciplinary action.\nFirst documented case of blood doping.", color = "white") +
-  annotate(geom = "text", x = 2012, y = 60, label = "38% of Russian atheletes submitted\nfor competition were rejected due\nto state-sponsored doping scandal", color = "white", size = 4.5) +
+  annotate(geom = "text", x = 1958, y = 95, label = "The Chemists' Games", fontface = "bold", color = "white", size = 4.5) + 
+  annotate(geom = "text", x = 1958, y = 83, label = "No athletes caught during the games.\nAdditional testing afterwards using new\ntechniques revealed 20% of specimens would\nhave resulted in disciplinary action.\nFirst documented case of blood doping.", color = "white") +
+  annotate(geom = "text", x = 2012, y = 85, label = "38% of Russian atheletes submitted\nfor competition were rejected due\nto state-sponsored doping scandal", color = "white", size = 4.5) +
+  annotate(geom = "text", x = 2002, y = 60, label = "As of 2017,\nthe 2008 Olympics has had\nthe most (50) medals stripped.\nRussia leads with 14 medals.", color = "white", size = 4.5) +
   coord_cartesian(xlim = c(1896, 2024), ylim = c(-10, 100)) +
   scale_x_continuous(name = NULL) +
   scale_y_continuous(name = NULL, labels = function(x) paste0(x, "%")) +
   theme(
-    plot.background = element_rect(fill = "firebrick4"),
-    panel.background = element_rect(fill = "firebrick4"),
+    plot.background = element_rect(fill = "gray20"),
+    panel.background = element_rect(fill = "gray20"),
     panel.grid = element_blank(),
     legend.position = "none",
     axis.text.y = element_text(color = "white", size = 15),
@@ -135,12 +124,8 @@ medal_plot <- rus %>%
   )
 ```
 
-- Embellish this plot with historical info at relevant bars   
-   - Russia has had the most medals stripped of any country (13 medals)
-- Replace x axis with "City\nYear"
-- Highlight years where the most russian athletes won, label with the sport  
-
-```{r}
+```{r tidy olympic_doping}
+# tidy olympic doping
 dope <- olympic_doping %>%
   fill(c(name, country), .direction = "down") %>%
   filter(str_detect(country, "(Russia|Soviet Union)")) %>%
@@ -160,8 +145,6 @@ dope <- olympic_doping %>%
 ## fill with sport
 ## inverted bar chart to be placed below the primary plot
 
-## need to make the 'dope' sports equal to olympic sports
-
 rus_ath_year <- olympics %>%
   filter(
     season == "Summer", 
@@ -177,20 +160,20 @@ dope_plot <- dope %>%
   inner_join(rus_ath_year) %>%
   mutate(prop = 100 * (n / athletes)) %>%
   ggplot(aes(year, -prop)) + 
-  geom_col(fill = "dodgerblue") + 
-  geom_text(aes(label = paste0(round(prop, 1), "%")), color = "white", face = "bold", vjust = 1) +
+  geom_bar(stat = "identity", fill = "firebrick1") + 
+  geom_text(aes(label = paste0(round(prop, 1), "%")), color = "white", fontface = "bold", vjust = 1) +
   # title
-  annotate(geom = "text", x = 1992, y = -10, label = "Percent of atheltes\ncaught doping", color = "white", fontface = "bold", size = 8) +
+  annotate(geom = "text", x = 1992, y = -10, label = "Percent of Russian\natheltes caught doping", color = "white", fontface = "bold", size = 6) +
   # subtitle
-  annotate(geom = "text", x = 1992, y = -22, label = "(not all athletes who were\ncaught doping won a medal)", fontface = "italic", color = "white", size = 5) +
+  annotate(geom = "text", x = 1992, y = -20, label = "(not all athletes who were caught doping\nwon a medal)", fontface = "italic", color = "white", size = 4) +
   scale_y_continuous(name = NULL, labels = function(x) paste0(abs(x), "%")) + 
-  coord_cartesian(xlim = c(1896, 2024), ylim = c(-30, 0)) +
+  coord_cartesian(xlim = c(1976, 2028), ylim = c(-30, 0)) +
   scale_x_continuous(name = NULL) +
   theme(
-    plot.background = element_rect(fill = "firebrick4"),
-    panel.background = element_rect(fill = "firebrick4"),
+    plot.background = element_rect(fill = "gray20"),
+    panel.background = element_rect(fill = "gray20"),
     panel.grid = element_blank(),
-    axis.text.y = element_text(color = "white", size = 15),
+    axis.text.y = element_blank(), #element_text(color = "white", size = 15),
     axis.text.x = element_blank(),
     axis.ticks.x = element_blank(),
   )
@@ -217,69 +200,103 @@ rus_drugs2 <- rus_drugs %>%
   mutate(
     drug = fct_other(anti_doping_rule_violation, keep = top_drugs, other_level = "Other"),
     drug = str_to_title(drug)
-  )
+  ) %>%
+  count(drug, sort = TRUE)
 
-drug_pie <- rus_drugs2 %>%
-  count(drug, sort = TRUE) %>%
-  ggplot(aes(x = "", y = n, fill = drug)) + 
-  geom_col() + 
-  scale_fill_brewer() + 
+drug_pie_plot <- rus_drugs2 %>%
+  arrange(desc(drug)) %>%
+  mutate(
+    prop = n / sum(rus_drugs2$n) * 100,
+    ypos = cumsum(prop) - 0.5 * prop
+  ) %>%
+  ggplot(aes(x = "", y = prop, fill = drug)) + 
+  geom_bar(stat = "identity", width = 1, color = "white") + 
+  geom_text(aes(y = ypos, label = paste0(round(prop), "%")), color = "white", size = 4) +
+  #scale_fill_brewer(palette = "Reds") + 
+  scale_fill_manual(values = c("lightpink2", "grey80", "red2", "darkred")) +
   coord_polar("y", start = 0) + 
   labs(
-    fill = "Drug"
+    fill = "Distribution of\nBanned Substances",
+    x = "",
+    y = ""
   ) +
-  theme_void()
+  theme(
+    panel.grid = element_blank(),
+    axis.ticks = element_blank(),
+    axis.text = element_blank(),
+    plot.background = element_rect(fill = "gray20"),
+    panel.background = element_rect(fill = "gray20"),
+    legend.text = element_text(color = "white", size = 12),
+    legend.title = element_text(color = "white", face = "bold", size = 14),
+    legend.background = element_blank()
+  )
 ```
-
 
 ```{r}
 # pie chart of which sports had the most dopers
+sports <- dope %>%
+  mutate(
+    category = case_when(
+      str_detect(sport, "[0-9]\\skg") ~ "Weightlifting",
+      str_detect(str_to_lower(sport), "(metre(s)?|relay|walk|marathon|throw|jump|shot put|pole vault|track)") ~ "Track and Field",
+      TRUE ~ sport
+    )
+  ) %>%
+  count(category, sort = TRUE)
+
+top_sports <- pull(head(sports, 3), category)
+
+sport_pie <- sports %>%
+  mutate(
+    sport = fct_other(category, keep = top_sports, other_level = "Other")
+  ) %>%
+  group_by(sport) %>%
+  dplyr::summarise(n = sum(n))
+
+sport_pie2 <- sport_pie %>%
+  arrange(desc(sport)) %>%
+  mutate(
+    prop = n / sum(sport_pie$n) * 100,
+    ypos = cumsum(prop) - 0.5 * prop
+  )
+
+sport_pie_plot <- sport_pie2 %>%
+  ggplot(aes(x = "", y = prop, fill = sport)) + 
+  geom_bar(stat = "identity", width = 1, color = "white") + 
+  geom_text(aes(y = ypos, label = paste0(round(prop), "%")), color = "white", size = 4) +
+  #scale_fill_brewer(palette = "Reds") + 
+  scale_fill_manual(values = c("darkred", "red2", "lightpink2", "gray80")) +
+  coord_polar("y", start = 0) + 
+  labs(
+    fill = "Distribution of Blood\nDoping Athletes by Sport",
+    x = "",
+    y = ""
+  ) +
+  theme(
+    panel.grid = element_blank(),
+    axis.ticks = element_blank(),
+    axis.text = element_blank(),
+    plot.background = element_rect(fill = "gray20"),
+    panel.background = element_rect(fill = "gray20"),
+    legend.text = element_text(color = "white", size = 12),
+    legend.title = element_text(color = "white", face = "bold", size = 14),
+    legend.background = element_blank()
+  )
 ```
 
 ```{r main plot, fig.height=10, fig.width=18}
 caption <- "**Source:** sports-reference.com & Kaggle  |  **More Info:** en.wikipedia.org/wiki/Doping_at_the_Olympic_Games  |  **Visualization By:** Nick Cruickshank"
 
 medal_plot /
-  dope_plot +
+  (drug_pie_plot + sport_pie_plot + dope_plot) +
   plot_layout(heights = c(10,3)) + 
   plot_annotation(
     title = "Relationship between Russian Olympic Performance and Blood Doping",
     caption = caption,
     theme = theme(
-      plot.background = element_rect(fill = "darkred", color = "darkred"),
+      plot.background = element_rect(fill = "gray20", color = "gray20"),
       plot.title = element_text(size = 32, color = "white", face = "bold"),
       plot.caption = element_textbox(size = 12, color = "white"),
     )
   )
-
 ```
-
-
-# Top Medaling Winter Olympics
-
-- Try grouping by event to count the numnber of events with medals
-
-```{r}
-olympics %>%
-  filter(season == "Winter") %>%
-  mutate(
-    team = case_when(
-      team == "Soviet Union" ~ "Russia",
-      team %in% c("East Germany", "West Germany") ~ "Germany",
-      team == "United States-1" ~ "United States",
-      team == "China-1" ~ "China",
-      team == "Australasia" ~ "Australia",
-      TRUE ~ team
-    )
-  ) %>%
-  group_by(team) %>%
-  dplyr::summarise(
-    total_athletes = n(),
-    total_gold = sum(medal == "Gold", na.rm = TRUE),
-    total_silver = sum(medal == "Silver", na.rm = TRUE),
-    total_bronze = sum(medal == "Bronze", na.rm = TRUE),
-    total_medals = total_gold + total_silver + total_bronze
-  ) %>%
-  arrange(desc(total_medals))
-```
-
