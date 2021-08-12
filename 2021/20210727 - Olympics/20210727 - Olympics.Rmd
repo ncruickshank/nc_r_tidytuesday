@@ -163,7 +163,7 @@ dope_plot <- dope %>%
   geom_bar(stat = "identity", fill = "firebrick1") + 
   geom_text(aes(label = paste0(round(prop, 1), "%")), color = "white", fontface = "bold", vjust = 1) +
   # title
-  annotate(geom = "text", x = 1992, y = -10, label = "Percent of Russian\natheltes caught doping", color = "white", fontface = "bold", size = 6) +
+  annotate(geom = "text", x = 1992, y = -10, label = "Percent of Russian\nathletes caught doping", color = "white", fontface = "bold", size = 6) +
   # subtitle
   annotate(geom = "text", x = 1992, y = -20, label = "(not all athletes who were caught doping\nwon a medal)", fontface = "italic", color = "white", size = 4) +
   scale_y_continuous(name = NULL, labels = function(x) paste0(abs(x), "%")) + 
@@ -291,7 +291,7 @@ medal_plot /
   (drug_pie_plot + sport_pie_plot + dope_plot) +
   plot_layout(heights = c(10,3)) + 
   plot_annotation(
-    title = "Relationship between Russian Olympic Performance and Blood Doping",
+    title = "Relationship between Russian Summer Olympic Performance and Blood Doping",
     caption = caption,
     theme = theme(
       plot.background = element_rect(fill = "gray20", color = "gray20"),
@@ -300,3 +300,5 @@ medal_plot /
     )
   )
 ```
+
+__Note:__ My choice to dive into Russia specifically was based on the viewing the documentary Icarus, and the countries banning from the most recent (2021) Summer Olypmic games. Further analysis could provide a similar history for other prominent countries at the Olympics (i.e., United States, Germany, Italy, Great Britain). Alternatively, a comparitive analysis evaluating medals against blood doping could be done for each of the top countries.
