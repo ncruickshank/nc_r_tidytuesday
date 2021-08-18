@@ -1,0 +1,150 @@
+---
+title: "20210810 - Economics"
+author: "Nick Cruickshank"
+date: "8/16/2021"
+output: 
+  github_document:
+    toc: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning=FALSE)
+```
+
+# Enrico Manlapig Analysis
+
+[Code found here](https://pbs.twimg.com/media/E8flzcxVgAQhVSp?format=jpg&name=4096x4096)
+
+```{r libraries}
+# libraries
+library(ggbump)
+library(ggthemes)
+library(readr)
+library(tidyverse)
+```
+
+```{r data}
+# data
+investment <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-08-10/investment.csv')
+chain_investment <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-08-10/chain_investment.csv')
+ipd <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-08-10/ipd.csv')
+```
+
+```{r tidy}
+# tidy
+ci <- chain_investment %>%
+  # filter for basic, social, and digital categories
+  filter(group_num %in% c(4,17,22)) %>%
+  mutate(
+    meta_cat = case_when(
+      meta_cat == "Total basic infrastructure" ~ "Basic",
+      TRUE ~ meta_cat
+    ),
+    category = case_when(
+      meta_cat == "Digital" ~ "Digital",
+      category == "Conservation and development" ~ "Conservation & \nDevelopment",
+      TRUE ~ category
+    ),
+    # make decades
+    decade = cut(year, breaks = seq(1947, 2017, 10), include.lowest = TRUE, dig.lab = 4, ordered = TRUE)
+  ) %>%
+  # aggregate, compute proportions, and rank
+  group_by(decade, meta_cat, category) %>%
+  dplyr::summarise(investment = sum(gross_inv_chain)) %>%
+  group_by(decade) %>%
+  mutate(
+    prop = investment / sum(investment),
+    rank = rank(-prop, ties = "random")
+  ) %>%
+  # labels
+  ungroup() %>%
+  mutate(
+    start_label = ifelse(decade == first(decade), category, NA),
+    end_label = ifelse(decade == last(decade), category, NA)
+  )
+```
+
+```{r Economics Rank Plot, fig.height=8, fig.width=14}
+# plot
+ci %>%
+  ggplot(aes(x = decade, y = rank, color = meta_cat, group = category)) + 
+  geom_bump(lwd = 2) + 
+  # start label
+  geom_text(
+    aes(x = first(decade), label = start_label, color = meta_cat),
+    hjust = 1, nudge_x = -0.1, show.legend = FALSE
+  ) + 
+  # end label
+  geom_text(
+    aes(x = last(decade), label = end_label, color = meta_cat),
+    hjust = 0, nudge_x = 0.1, show.legend = FALSE
+  ) +
+  expand_limits(x = c(-0.5, 10)) + 
+  scale_y_reverse(breaks = c(1:8)) + 
+  theme_economist() + 
+  scale_color_economist() + 
+  theme(
+    legend.position = "top",
+    panel.grid = element_blank(),
+    axis.line = element_blank(),
+    axis.ticks = element_blank()
+  ) + 
+  labs(
+    color = "",
+    x = "Decade",
+    y = "Rank",
+    title = "Infrastructure categories ranked by share of total real gross investment"
+  )
+```
+
+# Ben Nowak Analysis
+
+[Code found here](https://bjnnowak.netlify.app/2021/08/10/r-labelling-area-plots/)
+
+```{r}
+# tidy 2
+pal <- c("#0F4C5C", "#E36414", "#9A031E")
+
+main <- chain_investment %>%
+  filter(group_num == 1) %>%
+  mutate(
+    lab = case_when(
+      str_detect(category, "basic") ~ "Basic",
+      str_detect(category, "digital") ~ "Digital",
+      str_detect(category, "social") ~ "Social"
+    ),
+    lab = factor(lab, levels = c("Digital", "Social", "Basic")),
+    col_lab = case_when(
+      lab == "Basic" ~ "#0F4C5C",
+      lab == "Social" ~ "#E36414",
+      lab == "Digital" ~ "#9A031E"
+    )
+  ) 
+
+
+
+# labels for plot
+final <- main %>%
+  filter(year == 2017) %>%
+  arrange(desc(lab)) %>%
+  mutate(ypos = cumsum(gross_inv_chain))
+```
+
+```{r}
+# plot
+main %>%
+  ggplot(aes(x = year, y = gross_inv_chain, fill = lab)) + 
+  geom_area() + 
+  geom_text(data = final, aes(y = ypos - 150000, label = lab, color = lab), x = 2018, hjust = 0) +
+  scale_fill_manual(breaks = main$lab, values = main$col_lab) +
+  scale_color_manual(breaks = main$lab, values = main$col_lab) +
+  scale_x_continuous(limits = c(1947, 2022), breaks = c(1950, 1980, 2010)) +
+  guides(fill = FALSE, color = FALSE) + 
+  labs(
+    title = "Evolution of investment on US infrastructure",
+    x = "Year",
+    y = "Investment (millions of 2012 $)"
+  ) + 
+  theme_minimal()
+```
+
