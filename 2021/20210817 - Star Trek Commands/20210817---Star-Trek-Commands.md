@@ -124,7 +124,7 @@ sent_plot <- char_sent2 %>%
   scale_color_manual(values = c("Red", "Green")) + 
   scale_x_discrete(name = NULL, labels = labels) +
   guides(size = "none", color = "none") +
-  labs(y = "Interaction Type") + 
+  labs(y = "") + 
   theme_minimal() + 
   theme(
     plot.background = element_rect(fill = "#1D1135", color = "#1D1135"),
@@ -174,6 +174,7 @@ tf_idf_plot <- top_char_tf_idf %>%
   guides(size = "none") +
   scale_y_discrete(breaks = c(1:6)) +
   facet_wrap(~ factor(char, levels = top_characters), ncol = 5) + 
+  labs(y = "", x = "") +
   theme_minimal() + 
   theme(
     plot.background = element_rect(fill = "#1D1135", color = "#1D1135"),
