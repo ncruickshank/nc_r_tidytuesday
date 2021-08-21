@@ -1,20 +1,25 @@
 20210817 - Star Trek Commands
 ================
 Nick Cruickshank
-8/19/2021
+8/21/2021
 
--   [NCruickshank Tweet](#ncruickshank-tweet)
-    -   [Who had the most interactions with the
-        computer?](#who-had-the-most-interactions-with-the-computer)
+-   [Text Analysis of Interactions with the
+    Computer](#text-analysis-of-interactions-with-the-computer)
     -   [Sentiment Analysis by Star Trek Character and Interaction
         Type](#sentiment-analysis-by-star-trek-character-and-interaction-type)
-        -   [Facetted boxplots for each character by interaction
-            type](#facetted-boxplots-for-each-character-by-interaction-type)
--   [Other Tweets](#other-tweets)
+    -   [TF-IDF Analysis by Top
+        Character](#tf-idf-analysis-by-top-character)
+    -   [Combine Plots](#combine-plots)
+-   [Tweets of Inspiration](#tweets-of-inspiration)
 
 ``` r
 # libraries
+library(here)
+library(glue)
 library(ggtext)
+library(jpeg)
+library(patchwork)
+library(png)
 library(readr)
 library(sentimentr)
 library(tidytext)
@@ -26,54 +31,44 @@ library(tidyverse)
 computer <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-08-17/computer.csv')
 ```
 
-# NCruickshank Tweet
+# Text Analysis of Interactions with the Computer
+
+For this week’s [Tidy Tuesday
+Project](https://github.com/rfordatascience/tidytuesday/tree/master/data/2021/2021-08-17)
+I wanted to perform various text analysis tasks on lines spoken by each
+of the main cast members to the computer. Here, the “primary cast” is
+defined as the characters who had the greatest number of interactions
+with the computer. Interestingly, interactions with the computer
+slightly shift the rankings of most prominent character. Specifically,
+[Geordi La Forge](https://en.wikipedia.org/wiki/Geordi_La_Forge) is not
+the main character of [Star Trek: The Next
+Generation](https://en.wikipedia.org/wiki/Star_Trek:_The_Next_Generation),
+but he does have the most interactions with the computer by a
+comfortable margin.
 
 ``` r
-computer
-```
-
-    ## # A tibble: 2,214 x 14
-    ##     name char           line  direction type  pri_type domain sub_domain nv_resp
-    ##    <dbl> <chr>          <chr> <chr>     <chr> <chr>    <chr>  <chr>      <lgl>  
-    ##  1   102 Tasha          Batt~ The door~ Stat~ Stateme~ IoT    Turbolift  TRUE   
-    ##  2   102 Beverly        Show~ The scre~ Comm~ Command  InfoS~ <NA>       TRUE   
-    ##  3   102 Beverly        Yes ~ The scre~ Stat~ Stateme~ IoT    <NA>       TRUE   
-    ##  4   102 Picard         And ~ MAIN VIE~ Wake~ Question InfoS~ <NA>       FALSE  
-    ##  5   102 Picard         And ~ MAIN VIE~ Ques~ Question InfoS~ <NA>       FALSE  
-    ##  6   102 Picard         And ~ MAIN VIE~ Conv~ Question InfoS~ <NA>       FALSE  
-    ##  7   102 Young Ensign   You ~ At the t~ Comm~ Command  InfoS~ Locate     FALSE  
-    ##  8   102 Computer Voice Lieu~ <NA>      Resp~ Response InfoS~ Locate     FALSE  
-    ##  9   102 Computer Voice This~ <NA>      Info  Alert    InfoS~ <NA>       FALSE  
-    ## 10   102 Computer Voice This~ <NA>      Alert Alert    InfoS~ <NA>       FALSE  
-    ## # ... with 2,204 more rows, and 5 more variables: interaction <chr>,
-    ## #   char_type <chr>, is_fed <lgl>, error <lgl>, value_id <dbl>
-
-## Who had the most interactions with the computer?
-
-``` r
+# character interactions with the computer
 computer %>%
   filter(!(str_detect(char, "(Computer|Com Panel)"))) %>%
   count(char, sort = TRUE) %>%
-  head(10)
+  filter(n > 20) %>%
+  ggplot(aes(fct_reorder(char, n), n)) + 
+  geom_bar(stat = "identity") + 
+  geom_text(aes(label = n), hjust = 1) +
+  coord_flip() + 
+  labs(title = "Which Star Trek TNG Characters Interacted with the Computer the Most?")
 ```
 
-    ## # A tibble: 10 x 2
-    ##    char         n
-    ##    <chr>    <int>
-    ##  1 Geordi     320
-    ##  2 Picard     266
-    ##  3 Data       235
-    ##  4 Riker      150
-    ##  5 Beverly    121
-    ##  6 Troi        74
-    ##  7 Worf        66
-    ##  8 Barclay     41
-    ##  9 Wesley      30
-    ## 10 K'Ehleyr    20
+![](20210817---Star-Trek-Commands_files/figure-gfm/Star%20Trek%20TNG%20Char-Comp%20Interaction%20Counts-1.png)<!-- -->
+
+For the following analysis I chose to focus on the Top 5 characters by
+interactions with the computer. This decision was made in part because
+there was a fairly steep drop-off in interactions with the computer
+after [Beverly Crusher](https://en.wikipedia.org/wiki/Beverly_Crusher),
+which would make [Term Frequency - Inverse Document Frequency
+(TF-IDF)](https://en.wikipedia.org/wiki/Tf%E2%80%93idf) difficult.
 
 ## Sentiment Analysis by Star Trek Character and Interaction Type
-
-What was the average sentiment value for these metrics?
 
 ``` r
 char_sent <- computer %>%
@@ -86,6 +81,11 @@ char_sent <- computer %>%
   unite("char_pri", char:pri_type, remove = FALSE)
 
 top_characters <- head(count(char_sent, char, sort = TRUE), 5)$char
+
+char_ranks <- computer %>%
+  filter(char %in% top_characters) %>%
+  count(char, sort = TRUE) %>%
+  mutate(rank = row_number())
 
 char_sent2 <- char_sent %>%
   filter(char %in% top_characters) %>%
@@ -101,29 +101,120 @@ char_sent2 <- char_sent %>%
     abs_sentiment = abs(avg_line_sentiment),
     char = factor(char, levels = top_characters)
   )
+```
 
-char_sent2 %>%
-  ggplot(aes(char, pri_type)) + 
+``` r
+# plot
+
+## x-axis labels
+labels <- c(
+  "Geordi" = glue("<img src='{here('2021', '20210817 - Star Trek Commands', 'images', 'geordi.jpg')}' width='80'/><br>**Geordi**"),
+  "Picard" = glue("<img src='{here('2021', '20210817 - Star Trek Commands', 'images', 'picard.jpg')}' width='80'/><br>**Picard**"),
+  "Data" = glue("<img src='{here('2021', '20210817 - Star Trek Commands', 'images', 'data.jpg')}' width='80'/><br>**Data**"),
+  "Riker" = glue("<img src='{here('2021', '20210817 - Star Trek Commands', 'images', 'riker.jpg')}' width='80'/><br>**Riker**"),
+  "Beverly" = glue("<img src='{here('2021', '20210817 - Star Trek Commands', 'images', 'beverly.jpg')}' width='80'/><br>**Beverly**")
+)
+
+## plot the sentiment values
+sent_plot <- char_sent2 %>%
+  left_join(char_ranks, by = "char") %>%
+  ggplot(aes(fct_reorder(char, rank), pri_type)) + 
   geom_point(aes(size = abs_sentiment, color = sign)) + 
+  geom_text(aes(label = round(avg_line_sentiment, 3), color = sign), vjust = 1.75) +
   scale_color_manual(values = c("Red", "Green")) + 
+  scale_x_discrete(name = NULL, labels = labels) +
   guides(size = "none", color = "none") +
-  labs(
-    title = "Sentiment Analysis of Star Trek Characters by Interaction Type",
-    subtitle = "Size represents absolute sentiment while color represents direction (<b style='color:red'>negative</b> or <b style='color:green'>positive</b>)",
-    x = "Character",
-    y = "Interaction Type"
-  ) + 
+  labs(y = "Interaction Type") + 
   theme_minimal() + 
   theme(
-    plot.subtitle = element_textbox()
+    plot.background = element_rect(fill = "#1D1135", color = "#1D1135"),
+    panel.background = element_rect(fill = "#1D1135", color = "#1D1135"),
+    panel.border = element_blank(),
+    axis.text.y = element_text(color = "white"),
+    panel.grid.major.x = element_blank(),
+    panel.grid.major.y = element_line(linetype = "longdash"),
+    axis.text.x = element_markdown(color = "white", size = 15)
   )
 ```
 
-![](20210817---Star-Trek-Commands_files/figure-gfm/Star%20Trek%20Sentiment%20by%20Character%20and%20Command%20Type-1.png)<!-- -->
+## TF-IDF Analysis by Top Character
 
-### Facetted boxplots for each character by interaction type
+``` r
+extra_stop_words <- c("computer", "picard", "beverly", "crusher")
 
-# Other Tweets
+# one word phrases
+trek_words <- computer %>%
+  filter(char %in% top_characters) %>% # only inclue chars in graphic
+  unnest_tokens(word, line) %>% # tokenize lines into one word per row
+  anti_join(stop_words, by = "word") %>% # remove stop words
+  filter(!(word %in% extra_stop_words)) %>% # remove extra stop words
+  select(char, word)
+
+# perform tf-idf on tokens
+char_tf_idf <- trek_words %>%
+  add_count(word) %>% # count how often each work appears
+  filter(n >= 5) %>% # remove infrequently used tokens
+  count(word, char) %>% # create a column counting each token by char
+  bind_tf_idf(word, char, n) %>% # create TF-IDF scores
+  arrange(desc(tf_idf))
+
+# prep for plotting
+top_char_tf_idf <- char_tf_idf %>%
+  left_join(char_ranks, by = "char") %>%
+  group_by(rank, char) %>%
+  top_n(5, tf_idf) %>%
+  mutate(word_rank = rank(- tf_idf, ties = "random")) %>%
+  ungroup() %>%
+  filter(word_rank <= 5) 
+
+tf_idf_plot <- top_char_tf_idf %>%
+  ggplot(aes("", -word_rank)) + 
+  geom_text(aes(label = word, size = tf_idf), color = "white", fontface = "bold") + 
+  geom_text(aes(label = paste0("(", round(tf_idf, 4), ")"), size = 0.8 * tf_idf), vjust = 2, color = "white") +
+  guides(size = "none") +
+  scale_y_discrete(breaks = c(1:6)) +
+  facet_wrap(~ factor(char, levels = top_characters), ncol = 5) + 
+  theme_minimal() + 
+  theme(
+    plot.background = element_rect(fill = "#1D1135", color = "#1D1135"),
+    panel.background = element_rect(fill = "#1D1135", color = "#1D1135"),
+    panel.border = element_blank(),
+    panel.grid = element_blank(),
+    plot.title = element_textbox(color = "white"),
+    plot.subtitle = element_textbox(color = "white", width = unit(1, "npc"), margin = margin(b = 15)),
+    strip.text = element_blank()
+  )
+```
+
+## Combine Plots
+
+``` r
+# combine plots
+sent_plot /
+  tf_idf_plot + 
+  plot_annotation(
+    tag_levels = 'A',
+    title = "<b style='color:#8AE6FF'>Star Trek: The Next Generation</b><br><i style='color:#8750F5'>Interactions with the Computer</i>",
+    subtitle = "<br><b>(A) Sentiment Analysis by Character and Interaction Type:</b> Average sentiment value of lines spoken by each character by interaction type. Size represents absolute sentiment. Color represents sign (<b style='color:red'>negative</b> or <b style='color:green'>positive</b>). Exact sentiment value shown below the points.
+    <br><br>
+    <b>(B)TF-IDF Analysis by Character:</b> Top 5 words which were most unique to that character compared to the other primary characters as determined by term frequency-inverse document frequency (TF-IDF) analysis. Terms are ranked from highest to lowest TF-IDF score, with the exact value provided below the word.
+    <br><br>
+    <i style='color:#8750F5'> Characters arranged from left to right by the number of interactions with the computer.</i>",
+    caption = "Source: <b>speechinteraction.org</b> | Visualization: <b>NCruickshank (@shank4494)</b> | #TidyTuesday",
+    theme = theme(
+      plot.title = element_textbox(color = "white", size = 28, hjust = 0.5, halign = 0.5),
+      plot.subtitle = element_textbox(color = "white", width = unit(1, "npc"), margin = margin(b = 15), halign = 0.5),
+      plot.caption = element_textbox(color = "#8750F5", size = 10, hjust = 0.5),
+      plot.background = element_rect(fill = "#1D1135", color = "#1D1135"),
+      panel.border = element_blank()
+    )
+  ) &
+  theme(plot.tag = element_text(color = "white"))
+```
+
+![](20210817---Star-Trek-Commands_files/figure-gfm/Star%20Trek%20Character%20Computer%20Interactions-1.png)<!-- -->
+
+# Tweets of Inspiration
 
 ``` r
 # @neuroandstats Analysis
@@ -147,6 +238,10 @@ neuroandstats_plot <- avg_sentiment %>%
     title = "Sentiment analysis of Star Trek speech interactions",
     x = "Average Sentiment Value",
     y = "Type of Dialog",
-    caption = "Tidy Tuesday week 34 \ndata courtesy of SpeechInteraction.org"
+    caption = "Tidy Tuesday week 34 \ndata courtesy of SpeechInteraction.org\nVisualization inspired by code from @neuroandstats"
   )
+
+neuroandstats_plot
 ```
+
+![](20210817---Star-Trek-Commands_files/figure-gfm/neuroandstats%20plot-1.png)<!-- -->
