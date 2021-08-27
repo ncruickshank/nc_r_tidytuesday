@@ -43,6 +43,7 @@ library(ggtext)
 library(glue)
 library(forcats)
 library(here)
+library(patchwork)
 library(png)
 library(readr)
 library(tidyverse)
@@ -133,6 +134,25 @@ lemurs %>%
     strip.text = element_textbox()
   )
 ```
+
+```{r}
+# average litter size by taxon
+## colored by gender (may have to intuite this by distribution of gender)
+## maybe use geom_jitter() for this?
+```
+
+```{r}
+# geom text objects with 'avg weight at maturity' and 'avg age at maturity' by taxon
+## maturity defined as min age at conception
+## maybe break this down by gender as well?
+```
+
+```{r}
+# patchwork all three together
+## facet taxons with ncol = 1
+## have baby image as yaxis label for leftmost graph (litter size)
+```
+
 
 When grouping by `round(age_at_wt_mo)`, it appears that most lemurs have a period of sharp growth during the first few years of life after which point they plateau for the remainder of their life. If the goal here is to plot growth rates, perhaps it would be better to focus on the baby and infantile periods of life.
 
