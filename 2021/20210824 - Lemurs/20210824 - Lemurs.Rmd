@@ -68,15 +68,15 @@ taxon_map <- tibble(
 key_taxons <- pull(taxon_map, taxon)
 
 image_labels <- c(
-  "Crowned Lemur" = glue("<img src='{here('2021', '20210817 - Lemurs', 'images', 'A - Crowned Lemur.png')}' width='80'/><br>*Crowned Lemur*"),
-  "Ring-Tailed Lemur" = glue("<img src='{here('2021', '20210817 - Lemurs', 'images', 'B - Ring-Tailed Lemur.png')}' width='80'/><br>*Ring-Tailed Lemur*"), 
-  "Red Ruffed Lemur" = glue("<img src='{here('2021', '20210817 - Lemurs', 'images', 'C - Red Ruffed Lemur.png')}' width='80'/><br>*Red Ruffed Lemur*"), 
-  "Blue-Eyed Black Lemur" = glue("<img src='{here('2021', '20210817 - Lemurs', 'images', 'D - Blue-Eyed Black Lemur.png')}' width='80'/><br>*Blue-Eyed Black Lemur*"), 
-  "Pygmy Slow Loris" = glue("<img src='{here('2021', '20210817 - Lemurs', 'images', 'E - Pygmy Slow Loris.png')}' width='80'/><br>*Pygmy Slow Loris*"), 
-  "Coquerel's Sifaka" = glue("<img src='{here('2021', '20210817 - Lemurs', 'images', 'F - Coquerel's sifaka.png')}' width='80'/><br>*Coquerel's Sifaka*"),
-  "Black-and-White Ruffed Lemur" = glue("<img src='{here('2021', '20210817 - Lemurs', 'images', 'G - Black-and-White Ruffed Lemur.png')}' width='80'/><br>*Black-and-White Ruffed Lemurr*"),
-  "Gray Mouse Lemur" = glue("<img src='{here('2021', '20210817 - Lemurs', 'images', 'H - Gray Mouse Lemur.png')}' width='80'/><br>*Gray Mouse Lemur*"), 
-  "Aye-Aye" = glue("<img src='{here('2021', '20210817 - Lemurs', 'images', 'I - Aye-Aye.png')}' width='80'/><br>*Aye-Ayer*")
+  "Crowned Lemur" = glue("<img src='{here('2021', '20210824 - Lemurs', 'images', 'A - Crowned Lemur.png')}' width='80'/><br>*Crowned Lemur*"),
+  "Ring-Tailed Lemur" = glue("<img src='{here('2021', '20210824 - Lemurs', 'images', 'B - Ring-Tailed Lemur.png')}' width='80'/><br>*Ring-Tailed Lemur*"), 
+  "Red Ruffed Lemur" = glue("<img src='{here('2021', '20210824 - Lemurs', 'images', 'C - Red Ruffed Lemur.png')}' width='80'/><br>*Red Ruffed Lemur*"), 
+  "Blue-Eyed Black Lemur" = glue("<img src='{here('2021', '20210824 - Lemurs', 'images', 'D - Blue-Eyed Black Lemur.png')}' width='80'/><br>*Blue-Eyed<br>Black Lemur*"), 
+  "Pygmy Slow Loris" = glue("<img src='{here('2021', '20210824 - Lemurs', 'images', 'E - Pygmy Slow Loris.png')}' width='80'/><br>*Pygmy Slow Loris*"), 
+  "Coquerel's Sifaka" = glue("<img src='{here('2021', '20210824 - Lemurs', 'images', 'F - Coquerels sifaka.png')}' width='80'/><br>*Coquerel's Sifaka*"),
+  "Black-and-White Ruffed Lemur" = glue("<img src='{here('2021', '20210824 - Lemurs', 'images', 'G - Black-and-White Ruffed Lemur.png')}' width='80'/><br>*Black-and-White<br>Ruffed Lemurr*"),
+  "Gray Mouse Lemur" = glue("<img src='{here('2021', '20210824 - Lemurs', 'images', 'H - Gray Mouse Lemur.png')}' width='80'/><br>*Gray Mouse Lemur*"), 
+  "Aye-Aye" = glue("<img src='{here('2021', '20210824 - Lemurs', 'images', 'I - Aye-Aye.png')}' width='80'/><br>*Aye-Ayer*")
   )
 ```
 
@@ -105,7 +105,27 @@ Average age at death by taxon (i.e., `age_at_death_y`)
 
 ### Weight
 
-```{r Lemur Growth Rates, fig.height=4, fig.width=16}
+```{r Avg Litter Size, fig.height=16, fig.width=4}
+# average litter size by taxon
+## colored by gender (may have to intuite this by distribution of gender)
+## maybe use geom_jitter() for this?
+lemurs %>%
+  inner_join(taxon_map, by = "taxon") %>%
+  group_by(taxon, common_name) %>%
+  dplyr::summarise(
+    avg_litter_size = mean(litter_size, na.rm = TRUE)
+  ) %>%
+  ungroup() %>%
+  ggplot(aes(avg_litter_size, common_name)) + 
+  geom_text(aes(label = round(avg_litter_size)), size = 5) + 
+  facet_wrap(~ common_name, ncol = 1, scales = "free") + 
+  scale_y_discrete(name = NULL, labels = image_labels) +
+  theme(
+    axis.text.y = element_markdown(margin = margin(b = 8))
+  )
+```
+
+```{r Lemur Growth Rates, fig.height=16, fig.width=4}
 # weight by age and taxon
 ## grouping by age_at_wt_d is far too granular   (One = 17792, Not One = 9336)
 ## grouping by age_at_wt_wk is less granular     (One = 3209,  Not One = 7343)
@@ -125,7 +145,7 @@ lemurs %>%
   ungroup()  %>%
   ggplot(aes(round_age_mo, mean_weight)) +
   geom_line(aes(color  = sex)) + 
-  facet_wrap(~ common_name, ncol = 9, scales = "free") + 
+  facet_wrap(~ common_name, ncol = 1, scales = "free") + 
   labs(
     title = "Growth Rate in Infantile or Juvenile Lemurs by Taxon"
   ) +
@@ -135,11 +155,7 @@ lemurs %>%
   )
 ```
 
-```{r}
-# average litter size by taxon
-## colored by gender (may have to intuite this by distribution of gender)
-## maybe use geom_jitter() for this?
-```
+
 
 ```{r}
 # geom text objects with 'avg weight at maturity' and 'avg age at maturity' by taxon
