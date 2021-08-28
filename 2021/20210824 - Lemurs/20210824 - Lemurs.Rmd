@@ -67,6 +67,7 @@ taxon_map <- tibble(
 
 key_taxons <- pull(taxon_map, taxon)
 
+## create references to images used in y axis labels
 image_labels <- c(
   "Crowned Lemur" = glue("<img src='{here('2021', '20210824 - Lemurs', 'images', 'A - Crowned Lemur.png')}' width='80'/><br>*Crowned Lemur*"),
   "Ring-Tailed Lemur" = glue("<img src='{here('2021', '20210824 - Lemurs', 'images', 'B - Ring-Tailed Lemur.png')}' width='80'/><br>*Ring-Tailed Lemur*"), 
@@ -76,126 +77,214 @@ image_labels <- c(
   "Coquerel's Sifaka" = glue("<img src='{here('2021', '20210824 - Lemurs', 'images', 'F - Coquerels sifaka.png')}' width='80'/><br>*Coquerel's Sifaka*"),
   "Black-and-White Ruffed Lemur" = glue("<img src='{here('2021', '20210824 - Lemurs', 'images', 'G - Black-and-White Ruffed Lemur.png')}' width='80'/><br>*Black-and-White<br>Ruffed Lemurr*"),
   "Gray Mouse Lemur" = glue("<img src='{here('2021', '20210824 - Lemurs', 'images', 'H - Gray Mouse Lemur.png')}' width='80'/><br>*Gray Mouse Lemur*"), 
-  "Aye-Aye" = glue("<img src='{here('2021', '20210824 - Lemurs', 'images', 'I - Aye-Aye.png')}' width='80'/><br>*Aye-Ayer*")
+  "Aye-Aye" = glue("<img src='{here('2021', '20210824 - Lemurs', 'images', 'I - Aye-Aye.png')}' width='80'/><br>*Aye-Aye*")
   )
-```
 
-## Exploratory Data Analysis
-
-### Are there any specimens which show up more than once in the dataset?
-
-```{r EDA - Specimen ID Counts, fig.height=3, fig.width=10}
-lemurs %>%
-  count(dlc_id, birth_type, sort = TRUE) %>%
-  ggplot(aes(fct_reorder(dlc_id, n), n)) + 
-  geom_point() + 
-  facet_wrap(~ birth_type, ncol = 3, scales = "free_x") + 
-  theme_void()
-```
-
-It looks like many lemurs appear numerous times on the dataset. 
-
-### Lifespan Expectancies
-
-Average age at death by taxon (i.e., `age_at_death_y`)
-
-```{r}
-# geom_density_ridge() of age_at_death for each taxon
-```
-
-### Weight
-
-```{r Avg Litter Size, fig.height=16, fig.width=4}
-# average litter size by taxon
-## colored by gender (may have to intuite this by distribution of gender)
-## maybe use geom_jitter() for this?
-lemurs %>%
+## factor levels defined from largest to smallest min_age_at_concep
+factor_levels <- lemurs %>%
   inner_join(taxon_map, by = "taxon") %>%
-  group_by(taxon, common_name) %>%
+  group_by(common_name) %>%
+  dplyr::summarise(min_age_at_concep = mean(r_min_dam_age_at_concep_y)) %>%
+  arrange(desc(min_age_at_concep)) %>%
+  pull(common_name)
+
+## color schemes
+male_color <- "#8AE6FF"
+female_color <- "#FF8AF6"
+panel_color <- "#BCFF8A"
+plot_color <- "#A5DF79"
+grid_color <- "#769F56"
+text_color <- "#2F4023"
+```
+
+# Data Visualization
+
+## Average Litter Size By Taxon
+
+Had to remind myself to count the number of _distinct_ `dlc_id` with the same dam as their mother. Otherwise the resulting output thinks there are hundreds of offspring for lemur. If that were the case, this species wouldn't exactly be extinct!
+
+```{r Distribution of Total Offspring, fig.height=14, fig.width=4}
+# number of siblings (shared mother)
+litter_size_plot <- lemurs %>%
+  inner_join(taxon_map, by = "taxon") %>%
+  filter(birth_institution == "Duke Lemur Center") %>%
+  group_by(taxon, common_name, dam_id) %>%
   dplyr::summarise(
-    avg_litter_size = mean(litter_size, na.rm = TRUE)
+    male = n_distinct(dlc_id[sex == "M"]),
+    female = n_distinct(dlc_id[sex == "F"])
   ) %>%
   ungroup() %>%
-  ggplot(aes(avg_litter_size, common_name)) + 
-  geom_text(aes(label = round(avg_litter_size)), size = 5) + 
-  facet_wrap(~ common_name, ncol = 1, scales = "free") + 
-  scale_y_discrete(name = NULL, labels = image_labels) +
+  pivot_longer(cols = c("male", "female"), names_to = "gender", values_to = "siblings") %>%
+  group_by(taxon, common_name, gender) %>%
+  dplyr::summarise(
+    min = quantile(siblings, probs = 0.25),
+    median = median(siblings),
+    max = quantile(siblings, probs = 0.75)
+  ) %>%
+  ungroup() %>%
+  mutate(common_name = factor(common_name, levels = factor_levels)) %>%
+  ggplot(aes(median, common_name)) +
+  geom_crossbar(aes(xmin = min, xmax = max, fill = gender), position = "dodge2") +
+  scale_fill_manual(values = c(
+    "male" = male_color,
+    "female" = female_color
+  )) +
+  facet_wrap(~ common_name, scales = "free_y", ncol = 1) + 
+  scale_y_discrete(name = NULL, label = image_labels) + 
+  scale_x_continuous(name = NULL) + 
+  labs(title = "Offspring") +
+  theme_minimal() + 
   theme(
-    axis.text.y = element_markdown(margin = margin(b = 8))
+    plot.title = element_textbox(color = text_color, hjust = 0.5, size = 16),
+    axis.text.y = element_markdown(hjust= 0.5, color = text_color),
+    axis.ticks.y = element_blank(),
+    panel.grid.major.x = element_line(color = grid_color),
+    panel.grid.minor.x = element_blank(),
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor.y = element_blank(),
+    legend.position = "none",
+    strip.background = element_blank(),
+    strip.text.x = element_blank(),
+    plot.background = element_rect(fill = plot_color, color = plot_color),
+    panel.background = element_rect(fill = panel_color),
+    panel.border = element_blank()
   )
 ```
 
-```{r Lemur Growth Rates, fig.height=16, fig.width=4}
+## Growth Rates
+
+This graph averages the weight for each taxon at each month of age. Finding the average by day or by week was far too granular, as each timepoint had far too few samples to derive any meaningful pattern. Additionally, only infant and juvenile lemurs are plotted, as adult lemurs stop growing (duh), and as such reach a weight plateau. Finally, the y-axis scales are deliberately free because otherwise some of the smaller species (e.g., Gray Mouse Lemur) disappeared on the graph.
+
+```{r Lemur Growth Rates, fig.height=14, fig.width=4}
 # weight by age and taxon
 ## grouping by age_at_wt_d is far too granular   (One = 17792, Not One = 9336)
-## grouping by age_at_wt_wk is less granular     (One = 3209,  Not One = 7343)
-## grouping by age_at_wt_mo is far less granular (One = 215,   Not One = 2884)
-lemurs %>%
+## grouping by age_at_wt_wk is less granular     (One =  3209, Not One = 7343)
+## grouping by age_at_wt_mo is far less granular (One =   215, Not One = 2884)
+
+max_age_at_concep <- lemurs %>%
+  inner_join(taxon_map, by = "taxon") %>%
+  filter(common_name == "Aye-Aye") %>%
+  dplyr::summarise(mean = (ceiling(mean(r_min_dam_age_at_concep_y)) * 12)) %>%
+  pull(mean)
+
+growth_rate_plot <- lemurs %>%
   inner_join(taxon_map, by = "taxon") %>%
   filter(
     age_category == "IJ", # there is a hard plateau in weight after this point
-    sex != "ND"
+    sex != "ND",
+    birth_institution == "Duke Lemur Center"
   ) %>% 
-  mutate(round_age_mo = round(age_at_wt_wk)) %>%
+  mutate(round_age_mo = round(age_at_wt_mo)) %>%
   group_by(taxon, common_name, sex, round_age_mo) %>%
-  dplyr::summarise(
-    n = n(),
-    mean_weight = mean(weight_g)
-  ) %>%
+  dplyr::summarise(mean_weight = mean(weight_g)) %>%
   ungroup()  %>%
+  mutate(common_name = factor(common_name, levels = factor_levels)) %>%
   ggplot(aes(round_age_mo, mean_weight)) +
-  geom_line(aes(color  = sex)) + 
-  facet_wrap(~ common_name, ncol = 1, scales = "free") + 
-  labs(
-    title = "Growth Rate in Infantile or Juvenile Lemurs by Taxon"
-  ) +
+  geom_line(aes(color  = sex), size = 2) + 
+  scale_color_manual(values = c(
+    "M" = male_color,
+    "F" = female_color
+  )) +
+  scale_x_continuous(name = NULL, breaks = seq(0, max_age_at_concep, 12), labels = function(x) ifelse(x/12 == 1, paste0(x/12, "yr"), paste0(x/12, "yrs"))) +
+  scale_y_continuous(name = NULL, labels = function(x) paste0(x, "g")) +
+  facet_wrap(~ common_name, ncol = 1, scales = "free_y") + 
+  labs(title = "Average Monthly Weight Until Maturity") +
+  theme_minimal() + 
   theme(
-    legend.position = "bottom",
-    strip.text = element_textbox()
+    plot.title = element_textbox(hjust = 0.5, size = 16, color = text_color),
+    axis.text = element_text(color = text_color),
+    legend.position = "none",
+    strip.background = element_blank(),
+    strip.text.x = element_blank(),
+    panel.grid.major.x = element_line(color = grid_color),
+    panel.grid.minor.x = element_blank(),
+    panel.grid.major.y = element_line(color = grid_color, linetype = "dashed"),
+    panel.grid.minor.y = element_blank(),
+    plot.background = element_rect(fill = plot_color, color = plot_color),
+    panel.background = element_rect(fill = panel_color),
+    panel.border = element_blank()
   )
 ```
 
+## Weight at Adulthood
 
+I could have found the median weight at the young adult `age_category`, but I figured this group might still be growing slightly and therefore may distort the resulting bar charts. Here the scales are shared in order to highlight that there is in fact a huge range between the smallest lemur taxons and the largest lemur taxons.
 
-```{r}
+```{r plot3, fig.height=14, fig.width=4}
 # geom text objects with 'avg weight at maturity' and 'avg age at maturity' by taxon
 ## maturity defined as min age at conception
 ## maybe break this down by gender as well?
+
+## weight at sexual maturity
+adult_weight_plot <- lemurs %>%
+  inner_join(taxon_map, by = "taxon") %>%
+  filter(
+    age_category == "adult",
+    birth_institution == "Duke Lemur Center"
+  ) %>%
+  group_by(common_name, sex) %>%
+  dplyr::summarise(
+    mean_weight = median(weight_g), 
+  ) %>%
+  ungroup() %>%
+  mutate(common_name = factor(common_name, levels = factor_levels)) %>%
+  ggplot(aes(mean_weight, common_name, group = sex)) + 
+  geom_bar(aes(fill = sex), stat = "identity", position = position_dodge(width = 1), color = text_color) + 
+  scale_fill_manual(values = c(
+    "M" = male_color,
+    "F" = female_color
+  )) + 
+  geom_text(
+    aes(label = ifelse(mean_weight < 1000, paste0(round(mean_weight), "g"), paste0(round(mean_weight / 1000, 2), "kg"))),
+    position = position_dodge(width = 1), hjust = -0.1, color = text_color, fontface = "bold", size = 3
+  ) + 
+  scale_x_continuous(name = NULL, limits = c(0, 5000), labels = function(x) ifelse(x == 0, paste0(x, "kg"), paste0(x/1000, "kg"))) +
+  scale_y_discrete(name = NULL, labels = NULL) +
+  facet_wrap(~ common_name, ncol = 1, scales = "free_y") + 
+  labs(
+    title = "Adult Weight",
+  ) +
+  theme_minimal() + 
+  theme(
+    plot.title = element_textbox(hjust = 0.5, size = 16, color = text_color),
+    panel.grid.major.x = element_line(color = grid_color),
+    panel.grid.minor.x = element_blank(),
+    panel.grid.major.y = element_blank(),
+    axis.ticks = element_blank(),
+    axis.text.x = element_text(color = text_color),
+    legend.position = "none",
+    strip.text.x = element_blank(),
+    strip.background = element_blank(),
+    plot.background = element_rect(fill = plot_color, color = plot_color),
+    panel.background = element_rect(fill = panel_color),
+    panel.border = element_blank()
+  )
 ```
 
-```{r}
+## Patchwork
+
+```{r Lemur Development by Taxon and Gender, fig.height=16, fig.width=12}
 # patchwork all three together
 ## facet taxons with ncol = 1
 ## have baby image as yaxis label for leftmost graph (litter size)
+litter_size_plot + growth_rate_plot + adult_weight_plot + 
+  plot_layout(widths = c(1,3,1), ncol = 3) + 
+  plot_annotation(
+    title = glue("Lemur Development by Taxon and Gender (<i style='color:#68ACBF'>Male</i> or <i style='color:#BF68B9'>Female</i>)"),
+    subtitle = "Only specimens housed at the Duke Lemur Center considered for this analysis. Taxon arranged from longest timespan until young adulthood to shortest.<br><b>(A)</b> Distribution of total offspring throughout the mothers reproductive years, not necessarily the same as 'litter size'. Box represents interquartile range, vertical line represents median. Most mothers have between 1 to 2 offspring per gender with a relatively even gender distribution.<br><b>(B)</b> Average weight at each month along the infantile and juvenile development period.  Male and females reach sexual maturity at approximately the same age. Taxon which reach sexual maturity faster appear to have a more aggressive growth rate.<br><b>(C)</b> Median weight at adulthood. Young adults excluded due to potential for continued growth. Lemurs have a tremendous range in median mature specimen weights (from ~80g to ~4300g). Fairly even weight between the genders for most taxon.",
+    caption = "Data Source: <b>Duke Lemur Center</b> | Images Source: <b>Zehr et al 2014</b> | Visualization: <b>N. Cruickshank</b> | #TidyTuesday",
+    tag_levels = "A",
+    theme = theme(
+      plot.title = element_textbox(hjust = 0.5, size = 20, face = "bold", color = text_color),
+      plot.subtitle = element_textbox(halign = 0.5, size = 12, face = "italic", color = text_color, 
+                                      width = unit(1, "npc"), margin = margin(b = 15)),
+      plot.caption = element_textbox(hjust= 0.5, size = 10, color = text_color),
+      plot.background = element_rect(fill = plot_color, color = plot_color),
+      panel.border = element_blank()
+    )
+  ) &
+  theme(plot.tag = element_text(color = text_color))
 ```
-
-
-When grouping by `round(age_at_wt_mo)`, it appears that most lemurs have a period of sharp growth during the first few years of life after which point they plateau for the remainder of their life. If the goal here is to plot growth rates, perhaps it would be better to focus on the baby and infantile periods of life.
-
-- Need to find a way to include baby lemur images as axis labels  
-   - I would also like it to pair up with the facets of growth rates so I can remove the `strip.text`.  
-   - Maybe x-axis label is species, y axis is 1, label is ??? and size is static? What do I put there?  
-      - Avg Weight at maturity?  
-      - Avg Age at maturity?  
-      - Both?
-
-### Reproductive Behavior
-
-What is the peak reproductive age for dams and sires?
-
-Are there any times of year when lemurs are more likely to be born? What does this mean about the peak time of conception (i.e., `concep_month`)?
-
-Is there any difference on whether the lemur was captive born (`birth_type == "CB`) or wild-born (`birth_type == "WB"`)?
-
-Are there any differences in litter size by taxon (i.e., `litter_size`)?
-
-Distribution of gestation time by taxon (i.e., `concep_month`).
-
-### Where are most wildborn lemurs born?
-
-Found in `birth_institution` column.
-
-### Age at Death 
 
 # Citations
 
