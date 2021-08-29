@@ -1,0 +1,279 @@
+---
+title: "20210824 - Lemurs - Other Peoples Contributions"
+author: "Nick Cruickshank"
+date: "8/29/2021"
+output: 
+  github_document:
+    toc: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning=FALSE)
+```
+
+# Georgios Karamanis Analysis
+
+Tweet: https://twitter.com/geokaramanis/status/1432013926540009476
+Code: https://github.com/gkaramanis/tidytuesday/blob/master/2021/2021-week34/lemurs.R
+
+```{r}
+# libraries
+library(tidyverse)
+library(ggrepel)
+```
+
+```{r}
+# data
+lemurs <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-08-24/lemur_data.csv')
+taxonomy <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-08-24/taxonomy.csv')
+```
+
+```{r}
+# tidy
+lem_longev <- lemurs %>%
+  distinct(dlc_id, taxon, sex, age_max_live_or_dead_y) %>%
+  filter(sex != "ND") %>%
+  group_by(taxon, sex) %>%
+  summarise(longev = max(age_max_live_or_dead_y, na.rm = TRUE), n = n()) %>%
+  ungroup() %>%
+  # I didn't know you could select multiple columns for the values_from argument!
+  pivot_wider(id_cols = taxon, names_from = sex, values_from = c(longev, n)) %>%
+  group_by(taxon) %>%
+  mutate(
+    color = if_else(longev_F > longev_M, "#3A8AD8", "#F2A039"),
+    taxon_id = cur_group_id()
+  ) %>%
+  ungroup() %>%
+  mutate(taxon = if_else(taxon == "CMED", "CMEAD", taxon)) %>%
+  left_join(taxonomy, by = "taxon")
+```
+
+```{r}
+# values
+f1 = "Fira Sans Compressed"
+f2 = "Faune"
+col_bg = "grey96"
+```
+
+```{r gkaramanis plot, fig.height=11, fig.width=9}
+# plot
+ggplot(lem_longev) + 
+  # years axis
+  annotate(geom = "segment", x = 1.1, xend = 1.9, y = seq(10,40, by = 1), yend = seq(10,40, by = 1), alpha = 0.2, size = 0.2) + 
+  annotate(geom = "point", x = 1.5, y = seq(10, 40, by = 5), size = 16, color = col_bg) + 
+  annotate(geom = "text", x = 1.5, y = seq(10, 40, by = 5), label = seq(10, 40, by = 5), size = 8, alpha = 0.2, family = f2, fontface = "bold", color = "darkgreen") + 
+  # sex annotation
+  annotate(geom = "text", x = c(0.9, 2.1), y = 11.25, label = c("Female", "Male"), hjust = c(1, 0), family = f2, fontface = "bold", size = 10, alpha = 0.3, color = "darkgreen") +
+  # lollipops
+  geom_segment(aes(y = longev_F, yend = longev_M, x = 1, xend = 2, color = color)) + 
+  geom_point(aes(y = longev_F, x = 1, color = color, size = n_F)) + 
+  geom_point(aes(y = longev_M, x = 2, color = color, size = n_M)) + 
+  # species labels 
+  geom_text_repel(data = subset(lem_longev, taxon_id %% 2 != 0),
+                  aes(y = longev_M, x = 2, label = latin_name),
+                  nudge_x = 0.1, hjust = 0, direction = "y", family = f1,
+                  point.padding = 1, segment.size = 0.2, color = "grey15") + 
+  geom_text_repel(data = subset(lem_longev, taxon_id %% 2 == 0),
+                  aes(y = longev_F, x = 1, label = latin_name),
+                  nudge_x = -0.1, hjust = 1, direction = "y", family = f1,
+                  point.padding = 1, segment.size = 0.2, color = "grey15") + 
+  # scales, themes, etc
+  scale_x_continuous(limits = c(0.5, 2.5)) + 
+  scale_size_continuous(range = c(0.5, 5), breaks = seq(0, 120, by = 20), name = "Total number of lemurs hosted at DLC by species and sex") + 
+  scale_color_identity() + 
+  labs(
+    title = "Longest lived lemurs at the Duke Lumer Center",
+    subtitle = "Maximum age recorded in years (living or dead), by species and sex",
+    caption = "Source: Duke Lemur Center - Graphic: Georgios Karamanis"
+  ) + 
+  theme_void() + 
+  theme(
+    plot.background = element_rect(fill = col_bg, color = NA),
+    legend.position = "bottom",
+    legend.text = element_text(family = f1, color = "darkgreen"),
+    legend.title = element_text(family = f1, color = "darkgreen"),
+    legend.margin = margin(10, 0, 0, 0),
+    plot.title = element_text(hjust = 0.5, size = 28, family = f2, face = "bold", color = "darkgreen"),
+    plot.subtitle = element_text(margin = margin(7,0,0,0), hjust = 0.5, size = 18, family = f1, color = "grey30"),
+    plot.caption = element_text(hjust = 0.5, size = 10, color = "grey30", family = f1),
+    plot.margin = margin(20,20,20,20)
+  )
+```
+
+I think this plot would be better served by explaining what the size of the lollipop ends represent. Also the color of the lollipops should be explained, with a better color scheme. Blue and orange make for good contrasts, but they are less intuitive when most people consider blue a male color (not female color) and pink as a female color.
+
+## @quiet_grey Analysis
+
+Tweet: https://twitter.com/quite_grey/status/1431193177629802497
+Code: https://pastebin.com/MgcixcCB
+
+```{r libraries}
+# libraries
+library(ggforce)
+library(ggfx)
+library(lubridate)
+library(showtext)
+library(tidyverse)
+```
+
+```{r fonts}
+# fonts
+font_add_google("Fredoka One", "fred")
+font_add_google("Comfortaa", "comfortaa")
+```
+
+```{r data}
+# data
+tuesdata <- tidytuesdayR::tt_load(2021, week = 35)
+lemurs <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-08-24/lemur_data.csv')
+```
+
+```{r tidy}
+# tidy
+taxonomy <- tuesdata$taxonomy %>%
+  mutate(taxon = ifelse(taxon == "CMEAD", "CMED", taxon))
+
+lemur_tidy <- lemurs %>%
+  filter(
+    is.na(dod),
+    weight_date >= ymd(20190101)
+  ) %>%
+  group_by(dlc_id) %>%
+  slice(1) %>% # group_by() %>% slice() = efficient way of getting just one row for each specimen
+  ungroup() %>%
+  count(taxon, sort = TRUE, name = "count") %>%
+  mutate(share = 100 * (count / sum(count))) %>%
+  left_join(taxonomy, by = "taxon") %>%
+  select(taxon, common_name, count, share)
+```
+
+```{r inputs}
+# inputs
+position_x <- c(22, 20, 80, 37, 74, 46, 28, 85, 40, 62, 12, 81, 11, 95, 93, 50)
+position_y <- c(43, 80, 87, 10, 68, 90, 62, 12, 27, 13, 26, 25, 96, 54, 34, 74)
+hex_color <- c("#C68147", "#EFC048", "#F1A751", "#3A2610", "#98D0F2", "#DD9345", "#DEDB86", "#FAA247",
+                "#DBC49A", "#C99D79", "#CC8B42", "#D79D58", "#A5744C", "#AF6B43", "#B26948", "#B47D48")
+
+size_color <- lemur_tidy %>% pull(share) * 10 # scale up by 10 before area-radius conversion
+label <- lemur_tidy %>% pull(common_name)
+
+# df
+df <- tibble(
+  x = position_x,
+  y = position_y,
+  hex_color = hex_color,
+  size_color = sqrt((size_color / pi)),
+  label = label
+  ) %>%
+  mutate(
+    right = x + size_color + 1,
+    left = x - size_color - 1,
+    size_black = size_color * 0.1
+  )
+```
+
+```{r graphic}
+# graphic
+showtext_auto()
+showtext_opts(dpi = 300)
+```
+
+```{r quiet_grey plot, fig.height=6, fig.width=6}
+# subtitle
+## didn't know this function existed! looks useful
+subtitle_label <- str_wrap(
+  "The Duke Lemur Center houses the most diverse population of lemurs outside their native Madagascar",
+  25
+)
+
+# legend
+legend_df <- tibble(
+  share = c(2.44, 9.76),
+  label = c("5 Lemurs", "20 Lemurs")
+  ) %>%
+  mutate(size_color = sqrt(((share * 10) / pi)))
+
+# plot
+ggplot(df) +
+  with_inner_glow(
+    geom_circle(aes(x0 = left, y0 = y, r = size_color, fill = hex_color),
+                color = NA),
+    sigma = 8,
+    expand = 2,
+    color = "#A26B30"
+  ) + 
+  with_inner_glow(
+    geom_circle(aes(x0 = right, y0 = y, r = size_color, fill = hex_color),
+                color = NA),
+    sigma = 8,
+    expand = 2,
+    color = "#A26B30"
+  ) + 
+  with_outer_glow(
+    geom_circle(aes(x0 = left, y0 = y, r = size_black),
+                fill = "black",
+                color = NA),
+    sigma = 5,
+    expand = 5,
+    color = "#A26B30"
+  ) + 
+  with_outer_glow(
+    geom_circle(aes(x0 = right, y0 = y, r = size_black),
+                fill = "black",
+                color = NA),
+    sigma = 5,
+    expand = 5,
+    color = "#A26B30"
+  ) + 
+  geom_text(aes(x, y - size_color, label = label),
+            nudge_y = -2, 
+            family = "comfortaa",
+            color = "#F9F3E7",
+            size = 2) +
+  # legend
+  geom_circle(data = legend_df, aes(x0 = c(3,14), y0 = c((10 - (5.57 - 2.79)), 10), r = size_color),
+                                    fill = NA,
+                                    color = "#F9F3E7") + 
+  geom_text(data = legend_df, aes(x = c(3,14), y = c(1.5, 1.5), label = label),
+            family = "comfortaa", 
+            color = "#F9F3E7",
+            size = 2) + 
+  # annotations
+  annotate(geom = "text", x = 80, y = 55, label = "lemurs", hjust = 1, vjust = 1,
+           color = "#F9F3E7",
+           family = "fred",
+           size = 13) + 
+  annotate(geom = "text", x = 80, y = 46, label = subtitle_label, hjust = 1, vjust = 1,
+           color = "#F9F3E7",
+           family = "comfortaa",
+           size = 3) +
+  annotate(geom = "text", x = 99, y = 1, label = "Note: Includes 205 lemurs with weight records in 2019",
+           hjust = 1, vjust = 0,
+           color = "#F9F3E7",
+           family = "comfortaa",
+           size = 2) +
+  annotate(geom = "text", x =  99, y = 99, label = "Source: Duke Lemur Center | #TidyTuesday 2021 W35 | @quiet_grey",
+           hjust = 1, vjust = 1,
+           color = "#F9F3E7",
+           family = "comfortaa",
+           size = 2) +
+  scale_x_continuous(limits = c(0, 100)) + 
+  scale_y_continuous(limits = c(0, 100)) +
+  scale_size_identity() +
+  scale_fill_identity() + 
+  coord_fixed() + 
+  theme_void() + 
+  theme(
+    legend.position = "none",
+    panel.background = element_rect(fill = "#1E1722", color = "#1E1722"),
+    plot.background = element_rect(fill = "#1E1722", color = "#1E1722")
+  )
+```
+
+```{r}
+showtext_auto() # turn off the showtext
+```
+
+
+
+
