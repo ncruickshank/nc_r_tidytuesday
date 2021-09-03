@@ -1,0 +1,78 @@
+---
+title: "20210831 - Bird Baths"
+author: "Nick Cruickshank"
+date: "9/2/2021"
+output: 
+  github_document:
+    toc: true
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning=FALSE)
+```
+
+# Introduction
+
+# Exploratory Data Analysis
+
+```{r libraries}
+# libraries
+library(forcats)
+library(readr)
+library(tidyverse)
+```
+
+```{r data}
+# data
+bird_baths <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-08-31/bird_baths.csv')
+
+## view dataset
+bird_baths %>%
+  head()
+```
+
+## What are the most populous birds?
+
+```{r}
+bird_counts <- bird_baths %>%
+  group_by(bird_type) %>%
+  summarise(total = sum(bird_count)) %>%
+  arrange(desc(total)) 
+
+# bird_counts %>%
+#   ggplot(aes(fct_reorder(bird_type, total), total)) + 
+#   geom_hline(yintercept = 300) + 
+#   geom_point() + 
+#   scale_x_discrete(name = NULL, labels = NULL)
+
+most_populous_birds <- bird_counts %>%
+  filter(total > 300) %>%
+  pull(bird_type)
+```
+
+## Which birds had the biggest raw change from Urban to Rural?
+
+Looks like there's a fairly decent breaking point around 300 birds total.
+
+```{r}
+
+```
+
+## Which birds had the biggest raw change from 2014 to 2015?
+
+For either urban and / or rural.
+
+## Ideas from Cleary et al 2016
+
+### Do assemblages at urban and rural bird baths differ across bioregions?
+
+Use [PERMANOVA](https://en.wikipedia.org/wiki/Permutational_analysis_of_variance), which can be found in the `vegan` and `InPerm` packages.
+
+
+### Do assemblages at urban and rural bird baths differ within bioregions?
+
+[Multidimensional Scaling (nMDS) ordination techniques](http://strata.uga.edu/8370/lecturenotes/multidimensionalScaling.html) found in library `vegan` and PERMANOVA
+
+### Is species richness different at bird baths in rural areas compared to urban areas?
+
