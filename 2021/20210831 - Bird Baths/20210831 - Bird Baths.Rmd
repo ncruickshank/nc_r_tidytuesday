@@ -49,19 +49,35 @@ bird_counts <- bird_baths %>%
 most_populous_birds <- bird_counts %>%
   filter(total > 300) %>%
   pull(bird_type)
+
+most_populous_birds
 ```
 
 ## Which birds had the biggest raw change from Urban to Rural?
 
 Looks like there's a fairly decent breaking point around 300 birds total.
 
-```{r}
 
-```
 
 ## Which birds had the biggest raw change from 2014 to 2015?
 
 For either urban and / or rural.
+
+Overall change (ignoring urban / rural and bioregion) shows the following reductions from 2014
+
+```{r}
+bird_baths %>%
+  filter(!(is.na(survey_year))) %>%
+  group_by(bird_type, survey_year) %>%
+  dplyr::summarise(
+    total = sum(bird_count)
+  ) %>%
+  ungroup() %>%
+  pivot_wider(names_from = "survey_year", values_from = "total", names_prefix = "survey_") %>%
+  mutate(delta = survey_2015 - survey_2014) %>%
+  arrange(delta) %>%
+  head(10)
+```
 
 ## Ideas from Cleary et al 2016
 

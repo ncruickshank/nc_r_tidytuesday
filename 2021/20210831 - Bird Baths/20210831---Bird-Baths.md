@@ -65,7 +65,14 @@ bird_counts <- bird_baths %>%
 most_populous_birds <- bird_counts %>%
   filter(total > 300) %>%
   pull(bird_type)
+
+most_populous_birds
 ```
+
+    ##  [1] "Noisy Miner"       "Australian Magpie" "Rainbow Lorikeet" 
+    ##  [4] "Red Wattlebird"    "Superb Fairy-wren" "Magpie-lark"      
+    ##  [7] "Pied Currawong"    "Crimson Rosella"   "Eastern Spinebill"
+    ## [10] "Spotted Dove"
 
 ## Which birds had the biggest raw change from Urban to Rural?
 
@@ -75,6 +82,31 @@ total.
 ## Which birds had the biggest raw change from 2014 to 2015?
 
 For either urban and / or rural.
+
+Overall change (ignoring urban / rural and bioregion) shows the
+following reductions from 2014
+
+``` r
+bird_baths %>%
+  filter(!(is.na(survey_year))) %>%
+  group_by(bird_type, survey_year) %>%
+  dplyr::summarise(
+    total = sum(bird_count)
+  ) %>%
+  ungroup() %>%
+  pivot_wider(names_from = "survey_year", values_from = "total", names_prefix = "survey_") %>%
+  mutate(delta = survey_2015 - survey_2014) %>%
+  arrange(delta) %>%
+  head(10)
+```
+
+<div data-pagedtable="false">
+
+<script data-pagedtable-source type="application/json">
+{"columns":[{"label":["bird_type"],"name":[1],"type":["chr"],"align":["left"]},{"label":["survey_2014"],"name":[2],"type":["dbl"],"align":["right"]},{"label":["survey_2015"],"name":[3],"type":["dbl"],"align":["right"]},{"label":["delta"],"name":[4],"type":["dbl"],"align":["right"]}],"data":[{"1":"Rainbow Lorikeet","2":"167","3":"68","4":"-99"},{"1":"Pied Currawong","2":"125","3":"32","4":"-93"},{"1":"Satin Bowerbird","2":"92","3":"39","4":"-53"},{"1":"Lewin's Honeyeater","2":"86","3":"47","4":"-39"},{"1":"Noisy Miner","2":"163","3":"129","4":"-34"},{"1":"Eastern Yellow Robin","2":"61","3":"28","4":"-33"},{"1":"Eastern Spinebill","2":"91","3":"62","4":"-29"},{"1":"Spotted Dove","2":"89","3":"62","4":"-27"},{"1":"Little Wattlebird","2":"70","3":"46","4":"-24"},{"1":"Sulphur-crested Cockatoo","2":"51","3":"31","4":"-20"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
+  </script>
+
+</div>
 
 ## Ideas from Cleary et al 2016
 
