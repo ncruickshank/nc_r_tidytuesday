@@ -27,6 +27,9 @@ Nick Cruickshank
 ``` r
 # libraries
 library(forcats)
+library(ggrepel)
+library(ggtext)
+library(patchwork)
 library(readr)
 library(tidyverse)
 ```
@@ -87,26 +90,131 @@ Overall change (ignoring urban / rural and bioregion) shows the
 following reductions from 2014
 
 ``` r
-bird_baths %>%
+# get list of most frequently occuring birds
+top_10_birds <- bird_baths %>%
   filter(!(is.na(survey_year))) %>%
-  group_by(bird_type, survey_year) %>%
-  dplyr::summarise(
-    total = sum(bird_count)
-  ) %>%
+  group_by(bird_type) %>%
+  dplyr::summarise(total = sum(bird_count)) %>%
   ungroup() %>%
-  pivot_wider(names_from = "survey_year", values_from = "total", names_prefix = "survey_") %>%
-  mutate(delta = survey_2015 - survey_2014) %>%
-  arrange(delta) %>%
-  head(10)
+  arrange(desc(total)) %>%
+  head(10) %>%
+  pull(bird_type)
+
+# may want to consider using the species with the most statistically significant changes from one group to other
 ```
 
-<div data-pagedtable="false">
+``` r
+# create seqmnet df
+bath_years <- bird_baths %>%
+  filter(
+    !(is.na(survey_year))
+  ) %>%
+  group_by(survey_year, urban_rural, bird_type) %>%
+  dplyr::summarise(
+    total_birds = sum(bird_count, na.rm = TRUE)
+  ) %>%
+  ungroup() %>%
+  pivot_wider(id_cols = c("urban_rural", "bird_type"), names_from = "survey_year", values_from = "total_birds", names_prefix = "y") %>%
+  group_by(urban_rural, bird_type) %>%
+  mutate(
+    color = ifelse(y2014 > y2015, "#876429", "#298735"),
+    bird_id = cur_group_id()
+  ) %>%
+  ungroup()
+```
 
-<script data-pagedtable-source type="application/json">
-{"columns":[{"label":["bird_type"],"name":[1],"type":["chr"],"align":["left"]},{"label":["survey_2014"],"name":[2],"type":["dbl"],"align":["right"]},{"label":["survey_2015"],"name":[3],"type":["dbl"],"align":["right"]},{"label":["delta"],"name":[4],"type":["dbl"],"align":["right"]}],"data":[{"1":"Rainbow Lorikeet","2":"167","3":"68","4":"-99"},{"1":"Pied Currawong","2":"125","3":"32","4":"-93"},{"1":"Satin Bowerbird","2":"92","3":"39","4":"-53"},{"1":"Lewin's Honeyeater","2":"86","3":"47","4":"-39"},{"1":"Noisy Miner","2":"163","3":"129","4":"-34"},{"1":"Eastern Yellow Robin","2":"61","3":"28","4":"-33"},{"1":"Eastern Spinebill","2":"91","3":"62","4":"-29"},{"1":"Spotted Dove","2":"89","3":"62","4":"-27"},{"1":"Little Wattlebird","2":"70","3":"46","4":"-24"},{"1":"Sulphur-crested Cockatoo","2":"51","3":"31","4":"-20"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
-  </script>
+``` r
+# plot
+rural_lollipops <- bath_years %>%
+  filter(urban_rural == "Rural", bird_type %in% top_10_birds) %>% 
+  ggplot() +
+  # total count axis
+  annotate("segment", x = 1.1, xend = 1.9, y = seq(10, 70, 5), yend = seq(10, 70, 5), alpha = 0.2, size = 0.2) +
+  annotate("point", x = 1.5, y = seq(10, 70, 10), size = 16, color = "grey96") +
+  annotate("text", x = 1.5, y = seq(10, 70, 10), label = seq(10, 70, 10), size = 8, alpha = 0.2, fontface = "bold", color = "#87297B") +
+  # year annotations
+  annotate("text", x = c(0.9, 2.1), y = 5, label = c("2014", "2015"), hjust = c(1,0), fontface = "bold", size = 10, alpha = 0.3, color = "#87297B") + 
+  # lollipops
+  geom_segment(aes(y = y2014, yend = y2015, x = 1, xend = 2, color = color)) + 
+  geom_point(aes(y = y2014, x = 1, color = color, size = y2014)) + 
+  geom_point(aes(y = y2015, x = 2, color = color, size = y2015)) + 
+  # bird labels
+  ggrepel::geom_text_repel(
+    data = filter(bath_years, urban_rural == "Rural", bird_type %in% top_10_birds, bird_id %% 2 == 0),
+    aes(y = y2014, x = 1, label = bird_type, color = color),
+    nudge_x = -0.2, hjust = 1, direction = "y", point.padding = 1, segement.size = 0.2, fontface = "italic"
+  ) +
+  ggrepel::geom_text_repel(
+    data = filter(bath_years, urban_rural == "Rural", bird_type %in% top_10_birds, bird_id %% 2 != 0),
+    aes(y = y2015, x = 2, label = bird_type, color = color),
+    nudge_x = 0.2, hjust = 0, direction = "y", point.padding = 1, segement.size = 0.2, fontface = "italic"
+  ) +
+  # scales, themes, etc
+  scale_color_identity() + 
+  scale_size_continuous(guide = "none") + 
+  scale_x_continuous(limits = c(0.5, 2.5)) + 
+  labs(
+    title = "RURAL"
+  ) + 
+  theme_void() + 
+  theme(
+    plot.title = element_textbox(color = "#294C87", hjust = 0.5, size = 24, face = "bold")
+  )
 
-</div>
+rural_lollipops
+```
+
+![](20210831---Bird-Baths_files/figure-gfm/Rural%20Bird%20Bath%20Lollipops-1.png)<!-- -->
+
+``` r
+# plot
+urban_lollipops <- bath_years %>%
+  filter(urban_rural == "Urban", bird_type %in% top_10_birds) %>% 
+  ggplot() +
+  # total count axis
+  annotate("segment", x = 1.1, xend = 1.9, y = seq(10, 140, 10), yend = seq(10, 140, 10), alpha = 0.2, size = 0.2) +
+  annotate("point", x = 1.5, y = seq(10, 140, 10), size = 16, color = "grey96") +
+  annotate("text", x = 1.5, y = seq(10, 140, 10), label = seq(10, 140, 10), size = 5, alpha = 0.2, fontface = "bold", color = "#87297B") +
+  # year annotations
+  annotate("text", x = c(0.9, 2.1), y = 5, label = c("2014", "2015"), hjust = c(1,0), fontface = "bold", size = 10, alpha = 0.3, color = "#87297B") + 
+  # lollipops
+  geom_segment(aes(y = y2014, yend = y2015, x = 1, xend = 2, color = color)) + 
+  geom_point(aes(y = y2014, x = 1, color = color, size = y2014)) + 
+  geom_point(aes(y = y2015, x = 2, color = color, size = y2015)) + 
+  # bird labels
+  ggrepel::geom_text_repel(
+    data = filter(bath_years, urban_rural == "Urban", bird_type %in% top_10_birds, bird_id %% 2 == 0),
+    aes(y = y2014, x = 1, label = bird_type, color = color),
+    nudge_x = -0.2, hjust = 1, direction = "y", point.padding = 1, segement.size = 0.2, fontface = "italic"
+  ) +
+  ggrepel::geom_text_repel(
+    data = filter(bath_years, urban_rural == "Urban", bird_type %in% top_10_birds, bird_id %% 2 != 0),
+    aes(y = y2015, x = 2, label = bird_type, color = color),
+    nudge_x = 0.2, hjust = 0, direction = "y", point.padding = 1, segement.size = 0.2, fontface = "italic"
+  ) +
+  # scales, themes, etc
+  scale_color_identity() + 
+  scale_size_continuous(guide = "none") + 
+  scale_x_continuous(limits = c(0.5, 2.5)) + 
+  labs(
+    title = "URBAN"
+  ) + 
+  theme_void() + 
+  theme(
+    plot.title = element_textbox(color = "#294C87", hjust = 0.5, size = 24, face = "bold")
+  )
+
+urban_lollipops
+```
+
+![](20210831---Bird-Baths_files/figure-gfm/Urban%20Bird%20Bath%20Lollipops-1.png)<!-- -->
+
+``` r
+# both plots, side by side
+## doesn't look amazing so far
+# urban_lollipops + rural_lollipops + 
+#   plot_layout(ncol = 2)
+```
 
 ## Ideas from Cleary et al 2016
 

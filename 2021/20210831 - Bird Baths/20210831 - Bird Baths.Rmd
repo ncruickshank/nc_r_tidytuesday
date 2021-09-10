@@ -19,6 +19,9 @@ knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning=FALSE)
 ```{r libraries}
 # libraries
 library(forcats)
+library(ggrepel)
+library(ggtext)
+library(patchwork)
 library(readr)
 library(tidyverse)
 ```
@@ -66,25 +69,134 @@ For either urban and / or rural.
 Overall change (ignoring urban / rural and bioregion) shows the following reductions from 2014
 
 ```{r}
-bird_baths %>%
+# get list of most frequently occuring birds
+top_10_birds <- bird_baths %>%
   filter(!(is.na(survey_year))) %>%
-  group_by(bird_type, survey_year) %>%
+  group_by(bird_type) %>%
+  dplyr::summarise(total = sum(bird_count)) %>%
+  ungroup() %>%
+  arrange(desc(total)) %>%
+  head(10) %>%
+  pull(bird_type)
+
+# may want to consider using the species with the most statistically significant changes from one group to other
+```
+
+```{r}
+# create seqmnet df
+bath_years <- bird_baths %>%
+  filter(
+    !(is.na(survey_year))
+  ) %>%
+  group_by(survey_year, urban_rural, bird_type) %>%
   dplyr::summarise(
-    total = sum(bird_count)
+    total_birds = sum(bird_count, na.rm = TRUE)
   ) %>%
   ungroup() %>%
-  pivot_wider(names_from = "survey_year", values_from = "total", names_prefix = "survey_") %>%
-  mutate(delta = survey_2015 - survey_2014) %>%
-  arrange(delta) %>%
-  head(10)
+  pivot_wider(id_cols = c("urban_rural", "bird_type"), names_from = "survey_year", values_from = "total_birds", names_prefix = "y") %>%
+  group_by(urban_rural, bird_type) %>%
+  mutate(
+    color = ifelse(y2014 > y2015, "#876429", "#298735"),
+    bird_id = cur_group_id()
+  ) %>%
+  ungroup()
 ```
+
+```{r Rural Bird Bath Lollipops, fig.height=10, fig.width=5.625}
+# plot
+rural_lollipops <- bath_years %>%
+  filter(urban_rural == "Rural", bird_type %in% top_10_birds) %>% 
+  ggplot() +
+  # total count axis
+  annotate("segment", x = 1.1, xend = 1.9, y = seq(10, 70, 5), yend = seq(10, 70, 5), alpha = 0.2, size = 0.2) +
+  annotate("point", x = 1.5, y = seq(10, 70, 10), size = 16, color = "grey96") +
+  annotate("text", x = 1.5, y = seq(10, 70, 10), label = seq(10, 70, 10), size = 8, alpha = 0.2, fontface = "bold", color = "#87297B") +
+  # year annotations
+  annotate("text", x = c(0.9, 2.1), y = 5, label = c("2014", "2015"), hjust = c(1,0), fontface = "bold", size = 10, alpha = 0.3, color = "#87297B") + 
+  # lollipops
+  geom_segment(aes(y = y2014, yend = y2015, x = 1, xend = 2, color = color)) + 
+  geom_point(aes(y = y2014, x = 1, color = color, size = y2014)) + 
+  geom_point(aes(y = y2015, x = 2, color = color, size = y2015)) + 
+  # bird labels
+  ggrepel::geom_text_repel(
+    data = filter(bath_years, urban_rural == "Rural", bird_type %in% top_10_birds, bird_id %% 2 == 0),
+    aes(y = y2014, x = 1, label = bird_type, color = color),
+    nudge_x = -0.2, hjust = 1, direction = "y", point.padding = 1, segement.size = 0.2, fontface = "italic"
+  ) +
+  ggrepel::geom_text_repel(
+    data = filter(bath_years, urban_rural == "Rural", bird_type %in% top_10_birds, bird_id %% 2 != 0),
+    aes(y = y2015, x = 2, label = bird_type, color = color),
+    nudge_x = 0.2, hjust = 0, direction = "y", point.padding = 1, segement.size = 0.2, fontface = "italic"
+  ) +
+  # scales, themes, etc
+  scale_color_identity() + 
+  scale_size_continuous(guide = "none") + 
+  scale_x_continuous(limits = c(0.5, 2.5)) + 
+  labs(
+    title = "RURAL"
+  ) + 
+  theme_void() + 
+  theme(
+    plot.title = element_textbox(color = "#294C87", hjust = 0.5, size = 24, face = "bold")
+  )
+
+rural_lollipops
+```
+
+```{r Urban Bird Bath Lollipops, fig.height=10, fig.width=5.625}
+# plot
+urban_lollipops <- bath_years %>%
+  filter(urban_rural == "Urban", bird_type %in% top_10_birds) %>% 
+  ggplot() +
+  # total count axis
+  annotate("segment", x = 1.1, xend = 1.9, y = seq(10, 140, 10), yend = seq(10, 140, 10), alpha = 0.2, size = 0.2) +
+  annotate("point", x = 1.5, y = seq(10, 140, 10), size = 16, color = "grey96") +
+  annotate("text", x = 1.5, y = seq(10, 140, 10), label = seq(10, 140, 10), size = 5, alpha = 0.2, fontface = "bold", color = "#87297B") +
+  # year annotations
+  annotate("text", x = c(0.9, 2.1), y = 5, label = c("2014", "2015"), hjust = c(1,0), fontface = "bold", size = 10, alpha = 0.3, color = "#87297B") + 
+  # lollipops
+  geom_segment(aes(y = y2014, yend = y2015, x = 1, xend = 2, color = color)) + 
+  geom_point(aes(y = y2014, x = 1, color = color, size = y2014)) + 
+  geom_point(aes(y = y2015, x = 2, color = color, size = y2015)) + 
+  # bird labels
+  ggrepel::geom_text_repel(
+    data = filter(bath_years, urban_rural == "Urban", bird_type %in% top_10_birds, bird_id %% 2 == 0),
+    aes(y = y2014, x = 1, label = bird_type, color = color),
+    nudge_x = -0.2, hjust = 1, direction = "y", point.padding = 1, segement.size = 0.2, fontface = "italic"
+  ) +
+  ggrepel::geom_text_repel(
+    data = filter(bath_years, urban_rural == "Urban", bird_type %in% top_10_birds, bird_id %% 2 != 0),
+    aes(y = y2015, x = 2, label = bird_type, color = color),
+    nudge_x = 0.2, hjust = 0, direction = "y", point.padding = 1, segement.size = 0.2, fontface = "italic"
+  ) +
+  # scales, themes, etc
+  scale_color_identity() + 
+  scale_size_continuous(guide = "none") + 
+  scale_x_continuous(limits = c(0.5, 2.5)) + 
+  labs(
+    title = "URBAN"
+  ) + 
+  theme_void() + 
+  theme(
+    plot.title = element_textbox(color = "#294C87", hjust = 0.5, size = 24, face = "bold")
+  )
+
+urban_lollipops
+```
+
+```{r Bird Lollipops, fig.height=10, fig.width=9}
+# both plots, side by side
+## doesn't look amazing so far
+# urban_lollipops + rural_lollipops + 
+#   plot_layout(ncol = 2)
+```
+
 
 ## Ideas from Cleary et al 2016
 
 ### Do assemblages at urban and rural bird baths differ across bioregions?
 
 Use [PERMANOVA](https://en.wikipedia.org/wiki/Permutational_analysis_of_variance), which can be found in the `vegan` and `InPerm` packages.
-
 
 ### Do assemblages at urban and rural bird baths differ within bioregions?
 
