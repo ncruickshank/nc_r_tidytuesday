@@ -1,0 +1,195 @@
+---
+title: "Formula 1 Racing"
+author: "Nick Cruickshank"
+date: "9/12/2021"
+output: 
+  github_document:
+    toc: true
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning=FALSE)
+```
+
+![](https://images.unsplash.com/photo-1505739679850-7adc7776516b?ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&ixlib=rb-1.2.1&auto=format&fit=crop&w=1050&q=80)
+
+# Introduction
+
+This week's [Tidy Tuesday Project](https://github.com/rfordatascience/tidytuesday/tree/master/data/2021/2021-09-07) features [Formula 1 Racing](https://en.wikipedia.org/wiki/Formula_One)! The data is made available through the [Ergast API](https://ergast.com/mrd/db/#csv). The [data dictionary](http://ergast.com/docs/f1db_user_guide.txt) can be found at that same website.
+
+Image from [CHUTTERSNAP](https://unsplash.com/@chuttersnap).
+
+# Prepare for Analysis
+
+## Libraries
+
+```{r libraries}
+# libraries
+library(ggbump)
+library(ggtext)
+library(readr)
+library(tidyverse)
+```
+
+## Data
+
+```{r data}
+# data
+circuits <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-09-07/circuits.csv')
+constructors <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-09-07/constructors.csv')
+drivers <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-09-07/drivers.csv')
+lap_times <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-09-07/lap_times.csv')
+races <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-09-07/races.csv')
+results <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-09-07/results.csv')
+```
+
+```{r circuits head}
+# circuits head
+head(circuits)
+```
+
+```{r constructors head}
+# constructors head
+head(constructors)
+```
+
+```{r drivers head}
+# drivers head 
+head(drivers)
+```
+
+```{r lap_times head}
+# lap_times head 
+head(lap_times)
+```
+
+```{r races head}
+# races head 
+head(races)
+```
+
+```{r results head}
+# results head
+head(results)
+```
+
+# Analysis
+
+Average lap time by constructor and constructor nationality for each of the most recent F1 seasons for constructors participating in the 2021 Season. I figured that Fastest Lap Time was too easy, and also not quite as meaningful for consistent performance.
+
+## Data Preparation
+
+### Join Tables
+
+```{r join}
+# join relevant datasets
+## prepare race df for joining
+race_tidy <- races %>%
+  left_join(circuits, by = "circuitId", suffix = c("_race", "_circuit")) %>%
+  select(raceId, year, name_race, name_circuit, location, country)
+
+## prepare drivers df for joining
+driver_tidy <- drivers %>%
+  mutate(name_driver = paste(forename, surname), nationality_driver = nationality) %>%
+  select(driverId, code, name_driver, nationality_driver)
+
+## prepare results df for joining
+### it provides a bridge between racers and constructors
+results_tidy <- results %>%
+  select(resultId, raceId, driverId, constructorId, fastestLapTime)
+
+## join all tables together and remove irrelevant columns
+f1 <- lap_times %>%
+  left_join(results_tidy, by = c("raceId", "driverId")) %>%
+  left_join(race_tidy, by = "raceId") %>%
+  left_join(constructors, by = "constructorId") %>%
+  left_join(driver_tidy, by = "driverId") %>%
+  select(-ends_with("Id"), -url)
+```
+
+The following dataframe most likely has more information than is strictly needed for the rank charts provided. But it could also likely be used for extracting more insights regarding lap times.
+
+```{r f1 head}
+## f1 head
+head(f1)
+```
+
+### Tidy f1 for plotting
+
+```{r tidy}
+# find out which constructors had the fastest average lap time in the most recent year of the race
+f1_2021_constructors <- f1 %>%
+  filter(year == 2021) %>%
+  group_by(name) %>%
+  dplyr::summarise(mean_lap_time = mean(milliseconds)) %>%
+  ungroup() %>%
+  pull(name)
+
+# reshape for rank plotting
+f1_ranks <- f1 %>%
+  filter(
+    name %in% f1_2021_constructors,
+    (year >= 2010 & year != 2021)
+  ) %>%
+  group_by(year, name, nationality) %>%
+  dplyr::summarise(
+    total_laps = n(),
+    distinct_drivers = n_distinct(name_driver),
+    mean_lap_time_ms = mean(milliseconds),
+    mean_lap_time_min = mean(milliseconds) / 60000
+  ) %>%
+  ungroup() %>%
+  group_by(year) %>%
+  mutate(rank = rank(-mean_lap_time_min, ties = "random")) %>%
+  ungroup() %>%
+  group_by(name) %>%
+  mutate(
+    start_year = ifelse((year == first(year) & (first(year) != last(year))), year, NA),
+    start_label = ifelse((year == first(year) & (first(year) != last(year))), name, NA),
+    end_year = ifelse(year == last(year), year, NA),
+    end_label = ifelse(year == last(year), name, NA)
+  )
+```
+
+Rank plot, where x axis is year of performance and y axis is constructor who participated in 2021 F1 Season.
+
+Formula 1 2021 is still ongoing.
+
+```{r formula1_mean_lap_time_ranks, fig.height=6, fig.width=12}
+f1_ranks %>%
+  ggplot(aes(year, rank, color = nationality, group = name)) + 
+  geom_bump(lwd = 2, alpha = 0.5) + 
+  annotate("text", x = seq(2010, 2020, 2), y = 0.5, label = paste0("'", seq(10, 20, 2)), color = "grey98", size = 5) + 
+  geom_text(
+    aes(x = start_year, label = start_label, color = nationality),
+    hjust = 1, nudge_x = -0.1, show.legend = FALSE, fontface = "bold", size  = 5
+  ) +
+  geom_text(
+    aes(x = end_year, label = end_label, color = nationality),
+    hjust = 0, nudge_x = 0.1, show.legend = FALSE, fontface = "bold", size  = 5
+  ) + 
+  expand_limits(x = c(2009, 2022)) + 
+  scale_y_reverse(breaks = c(1:10)) +
+  scale_color_brewer(palette = "Set1") +
+  guides(color = guide_legend(nrow = 1, title = "Constructor Nationality")) +
+  labs(
+    title = "Mean Lap Time Ranks for Constructors Competing in the 2021 Formula 1 Season",
+    subtitle = "First time constructors in the 2021 Formula 1 Season not included<br>",
+    x = "Year",
+    y = "Rank",
+    color = "",
+    caption = "Data Source: <b>Ergast API</b> |  Visualization: <b>N. Cruickshank</b> | #TidyTuesday",
+  ) +
+  theme_void() + 
+  theme(
+    legend.position = "top",
+    plot.title = element_textbox(hjust = 0.5, size = 20, face = "bold", color = "grey98"),
+    plot.subtitle = element_textbox(hjust = 0.5, size = 14, face = "italic", color = "grey80"),
+    plot.caption = element_textbox(hjust = 0.5, size = 12, color = "grey80"),
+    plot.background = element_rect(fill = "grey20"),
+    legend.text = element_text(size = 15, color = "grey98"),
+    legend.title = element_text(size = 15, color = "grey98")
+  )
+```
+
