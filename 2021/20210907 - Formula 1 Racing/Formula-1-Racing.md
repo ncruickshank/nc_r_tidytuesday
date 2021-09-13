@@ -208,7 +208,7 @@ f1_ranks <- f1 %>%
   ) %>%
   ungroup() %>%
   group_by(year) %>%
-  mutate(rank = rank(-mean_lap_time_min, ties = "random")) %>%
+  mutate(rank = rank(mean_lap_time_min, ties = "random")) %>%
   ungroup() %>%
   group_by(name) %>%
   mutate(
@@ -242,7 +242,7 @@ f1_ranks %>%
   scale_color_brewer(palette = "Set1") +
   guides(color = guide_legend(nrow = 1, title = "Constructor Nationality")) +
   labs(
-    title = "Mean Lap Time Ranks for Constructors Competing in the 2021 Formula 1 Season",
+    title = "Fastest Mean Lap Time Ranks for 2021 Formula 1 Season Constructors",
     subtitle = "First time constructors in the 2021 Formula 1 Season not included<br>",
     x = "Year",
     y = "Rank",
