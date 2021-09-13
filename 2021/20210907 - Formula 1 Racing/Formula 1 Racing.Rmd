@@ -148,7 +148,7 @@ f1_ranks <- f1 %>%
     start_year = ifelse((year == first(year) & (first(year) != last(year))), year, NA),
     start_label = ifelse((year == first(year) & (first(year) != last(year))), name, NA),
     end_year = ifelse(year == last(year), year, NA),
-    end_label = ifelse(year == last(year), name, NA)
+    end_label = ifelse(year == last(year), paste0("(", rank, ") ",name), NA)
   )
 ```
 
