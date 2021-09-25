@@ -1,0 +1,135 @@
+---
+title: "Emmy Awards"
+author: "Nick Cruickshank"
+date: "9/25/2021"
+output: 
+  github_document:
+    toc: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning=FALSE)
+```
+
+![](https://deadline.com/wp-content/uploads/2020/07/emmys.jpg?w=681&h=383&crop=1)
+
+# Introduction
+
+This weeks [Tidy Tuesday Project](https://github.com/rfordatascience/tidytuesday/tree/master/data/2021/2021-09-21) comes from [emmys.com](https://www.emmys.com/awards/nominations/award-search). 
+
+According to [Wikipedia](https://en.wikipedia.org/wiki/Emmy_Awards):
+> An Emmy Award, or simply Emmy, is a trophy presented at one of the numerous annual American events or competitions that each recognize achievements in a particular sector of the television industry. The Emmy is considered one of the four major entertainment awards in the United States, the others being the Grammy (for music), the Oscar (Academy Award) (for film), and the Tony (for theatre). The two events that receive the most media coverage are the Primetime Emmy Awards and the Daytime Emmy Awards, which recognize outstanding work in American primetime and daytime entertainment programming, respectively.
+
+# Data Analysis: Battle of the Streaming Services
+
+```{r libraries}
+# libraries
+library(hrbrthemes)
+library(readr)
+library(tidyverse)
+library(waffle)
+```
+
+```{r data}
+# data
+nominees <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-09-21/nominees.csv')
+```
+
+```{r}
+# head
+head(nominees)
+```
+
+```{r}
+# values
+
+## regexes
+outstanding_series_regex <- "^Outstanding*\\s*(Series|Program|Special)$" # needs some work
+
+## lists
+top_streaming_services <- c("Netflix", "Hulu", "Prime Video",
+                            "Disney+", "HBO", "Paramount+",
+                            "Peacock", "Apple TV+")
+```
+
+
+```{r}
+# tidy
+
+## filter for categories like "Outstanding X Series"
+emmy <- nominees %>%
+  select(-starts_with("page")) %>%
+  mutate(
+    category2 = str_to_title(str_remove(category, " - [0-9]{4}")),
+    title = str_to_title(title),
+    distributor = case_when(
+      distributor == "HBO Max" ~ "HBO",
+      distributor %in% c("Amazon", "Amazon Instant Video") ~ "Prime Video",
+      TRUE ~ distributor
+    ),
+    host = case_when(
+      str_detect(title, "Jon Stewart") ~ "Jon Stewart",
+      str_detect(title, "John Oliver") ~ "John Oliver",
+      str_detect(title, "Colbert") ~ "Stephen Colbert",
+      str_detect(title, "David Letterman") ~ "David Letterman",
+      str_detect(title, "Jimmy Kimmel") ~ "Jimmy Kimmel"
+    )
+  )
+
+shows_of_interest <- c("The Daily Show With Jon Stewart", "Last Week Tonight With John Oliver",
+                       "The Late Show With Stephen Colbert", "The Colbert Report",
+                       "Late Show With David Letterman", "Jimmy Kimmel Live")
+
+hosts <- c("Jon Stewart", "John Oliver", "Stephen Colbert", "David Letterman", "Jimmy Kimmel")
+
+host_categories <- emmy %>%
+  filter(!(is.na(host))) %>%
+  distinct(category) %>%
+  pull(category)
+
+category_winners <- emmy %>%
+  filter(
+    category %in% host_categories,
+    type == "Winner"
+  ) %>%
+  mutate(winner = ifelse(host %in% hosts, host, "Other")) %>%
+  distinct(category, winner)
+
+df <- emmy %>%
+  filter(category %in% host_categories) %>%
+  mutate(host = ifelse(host %in% hosts, host, "Other")) %>%
+  group_by(category) %>%
+  dplyr::summarise(
+    nominees = n(),
+    `Jon Stewart` = sum(host == "Jon Stewart"),
+    `John Oliver` = sum(host == "John Oliver"),
+    `Stephen Colbert` = sum(host == "Stephen Colbert"),
+    `David Letterman` = sum(host == "David Letterman"),
+    `Jimmy Kimmel` = sum(host == "Jimmy Kimmel"),
+    `Other` = sum(host == "Other")
+  ) %>%
+  ungroup() %>%
+  pivot_longer(cols = c(-category, -nominees)) %>%
+  left_join(category_winners, by = "category") %>%
+  mutate(result = ifelse(name == winner & name != "Other", 1, 0)) %>%
+  separate(category, into = c("category", "year"), sep = " - ")
+``` 
+
+# Plot
+
+```{r}
+# plot
+df %>%
+  group_by(year, name) %>%
+  dplyr::summarise(
+    Nominations = sum(value) - sum(result),
+    Wins = sum(result)
+  ) %>%
+  ungroup() %>%
+  pivot_longer(cols = c(-year, -name), names_to = "result", values_to = "n") %>%
+  mutate(fill = paste0(name, " - ", result)) %>%
+  ggplot(aes(fill = fill, values = n)) + 
+  geom_waffle(color = "white", size = .25, n_rows = 10, flip = TRUE) + 
+  facet_wrap(~ year, nrow = 1, strip.position = "bottom")
+```
+
