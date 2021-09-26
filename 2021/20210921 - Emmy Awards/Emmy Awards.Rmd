@@ -24,8 +24,10 @@ According to [Wikipedia](https://en.wikipedia.org/wiki/Emmy_Awards):
 
 ```{r libraries}
 # libraries
+library(fontawesome)
 library(hrbrthemes)
 library(readr)
+library(showtext)
 library(tidyverse)
 library(waffle)
 ```
@@ -117,7 +119,7 @@ df <- emmy %>%
 
 # Plot
 
-```{r Talk Show Waffles, fig.height=6, fig.width=10}
+```{r Talk Show Waffles, fig.height=8, fig.width=12}
 # plot
 waffle <- df %>%
   group_by(year, name) %>%
@@ -129,12 +131,12 @@ waffle <- df %>%
   pivot_longer(cols = c(-year, -name), names_to = "result", values_to = "n") %>%
   mutate(
     fill = factor(paste0(name, " - ", result), levels = c(
+      "Other - Win", "Other - Nomination",
       "Stephen Colbert - Win", "Stephen Colbert - Nomination",
       "Jon Stewart - Win", "Jon Stewart - Nomination",
       "John Oliver - Win", "John Oliver - Nomination",
       "Jimmy Kimmel - Win", "Jimmy Kimmel - Nomination",
-      "David Letterman - Win", "David Letterman - Nomination",
-      "Other - Win", "Other - Nomination"
+      "David Letterman - Win", "David Letterman - Nomination"
     )),
     year = as.double(year)
   ) %>%
@@ -142,23 +144,47 @@ waffle <- df %>%
     !(is.na(n)), !(is.na(year)),
     year != 2001
   )
+```
 
-ggplot(waffle, aes(fill = fill, values = n)) + 
-  geom_waffle(color = "white", size = .5, n_rows = 10, flip = TRUE) +
+
+```{r Talk Show Waffles, fig.height=8, fig.width=12}
+colbert_win_color <- "#F99C5C"
+colbert_nom_color <- "#CB9169"
+stewart_win_color <- "#78EE9F"
+stewart_nom_color <- "#7BC593"
+oliver_win_color <- "#78EEE2"
+oliver_nom_color <- "#7BC5BD"
+kimmel_win_color <- "#F29996"
+kimmel_nom_color <- "#C78F8E"
+letter_win_color <- "#C796F2"
+letter_nom_color <- "#AC8EC7"
+other_color <- "#EFEFEF"
+text_color <- "#F4E265"
+background_color <- "#001397"
+
+waffle %>%
+  mutate(result = factor(result)) %>%
+  filter(!str_detect(fill, "Other")) %>%
+  ggplot(aes(fill = name, values = n)) + 
+  geom_waffle(aes(color = result), size = .5, n_rows = 5, flip = TRUE) +
   facet_wrap(~ year, nrow = 1, strip.position = "bottom") + 
+  scale_color_manual(values = c("navy", "gold")) +
+  scale_fill_brewer(palette = "Oranges") +
   scale_x_discrete() + 
-  scale_y_continuous(labels = function(x) x * 10, # make this multiplyer the same as n_rows
+  scale_y_continuous(labels = function(x) x * 5, # make this multiplyer the same as n_rows
                      expand = c(0,0)) +
-  ggthemes::scale_fill_tableau(name=NULL) +
   coord_equal() + 
   labs(
     title = "Which Talk Show Hosts have the greatest success at the Emmy's?"
   ) +
   theme_minimal() + 
   theme(
-    legend.position = "bottom"
+    legend.position = "bottom",
+    plot.background = element_rect(fill = background_color),
+    plot.title = element_text(color = text_color),
+    legend.text = element_text(color = text_color),
+    strip.text = element_text(color = text_color),
+    axis.text.y = element_text(color = text_color)
   )
-# need to figure out a color schemes for each Talk Show Host (dark for wins, light for nominations)
-# also need to figure out if I want to keep the "Other" categories.
 ```
 
