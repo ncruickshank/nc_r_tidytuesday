@@ -117,19 +117,48 @@ df <- emmy %>%
 
 # Plot
 
-```{r}
+```{r Talk Show Waffles, fig.height=6, fig.width=10}
 # plot
-df %>%
+waffle <- df %>%
   group_by(year, name) %>%
   dplyr::summarise(
-    Nominations = sum(value) - sum(result),
-    Wins = sum(result)
+    Nomination = sum(value) - sum(result),
+    Win = sum(result)
   ) %>%
   ungroup() %>%
   pivot_longer(cols = c(-year, -name), names_to = "result", values_to = "n") %>%
-  mutate(fill = paste0(name, " - ", result)) %>%
-  ggplot(aes(fill = fill, values = n)) + 
-  geom_waffle(color = "white", size = .25, n_rows = 10, flip = TRUE) + 
-  facet_wrap(~ year, nrow = 1, strip.position = "bottom")
+  mutate(
+    fill = factor(paste0(name, " - ", result), levels = c(
+      "Stephen Colbert - Win", "Stephen Colbert - Nomination",
+      "Jon Stewart - Win", "Jon Stewart - Nomination",
+      "John Oliver - Win", "John Oliver - Nomination",
+      "Jimmy Kimmel - Win", "Jimmy Kimmel - Nomination",
+      "David Letterman - Win", "David Letterman - Nomination",
+      "Other - Win", "Other - Nomination"
+    )),
+    year = as.double(year)
+  ) %>%
+  filter(
+    !(is.na(n)), !(is.na(year)),
+    year != 2001
+  )
+
+ggplot(waffle, aes(fill = fill, values = n)) + 
+  geom_waffle(color = "white", size = .5, n_rows = 10, flip = TRUE) +
+  facet_wrap(~ year, nrow = 1, strip.position = "bottom") + 
+  scale_x_discrete() + 
+  scale_y_continuous(labels = function(x) x * 10, # make this multiplyer the same as n_rows
+                     expand = c(0,0)) +
+  ggthemes::scale_fill_tableau(name=NULL) +
+  coord_equal() + 
+  labs(
+    title = "Which Talk Show Hosts have the greatest success at the Emmy's?"
+  ) +
+  theme_minimal() + 
+  theme(
+    legend.position = "bottom"
+  )
+# need to figure out a color schemes for each Talk Show Host (dark for wins, light for nominations)
+# also need to figure out if I want to keep the "Other" categories.
 ```
 
