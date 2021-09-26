@@ -25,6 +25,7 @@ According to [Wikipedia](https://en.wikipedia.org/wiki/Emmy_Awards):
 ```{r libraries}
 # libraries
 library(fontawesome)
+library(ggtext)
 library(hrbrthemes)
 library(readr)
 library(showtext)
@@ -166,25 +167,31 @@ waffle %>%
   mutate(result = factor(result)) %>%
   filter(!str_detect(fill, "Other")) %>%
   ggplot(aes(fill = name, values = n)) + 
-  geom_waffle(aes(color = result), size = .5, n_rows = 5, flip = TRUE) +
+  geom_waffle(aes(color = result), size = 0.75, n_rows = 5, flip = TRUE,
+              height = 0.9, width = 0.9) +
   facet_wrap(~ year, nrow = 1, strip.position = "bottom") + 
-  scale_color_manual(values = c("navy", "gold")) +
-  scale_fill_brewer(palette = "Oranges") +
+  scale_color_manual(values = c(background_color, text_color), guide = "none") +
+  scale_fill_brewer(palette = "Dark2", name = NULL) +
   scale_x_discrete() + 
   scale_y_continuous(labels = function(x) x * 5, # make this multiplyer the same as n_rows
                      expand = c(0,0)) +
   coord_equal() + 
   labs(
-    title = "Which Talk Show Hosts have the greatest success at the Emmy's?"
+    title = "Talk Show Host Emmy Nominations",
+    subtitle = str_wrap("Highlighted cells represent wins."),
+    caption = "Data Source: <b>emmys.com</b> |  Visualization: <b>N. Cruickshank</b> | #TidyTuesday"
   ) +
   theme_minimal() + 
   theme(
-    legend.position = "bottom",
+    legend.position = "top",
     plot.background = element_rect(fill = background_color),
-    plot.title = element_text(color = text_color),
+    plot.title = element_text(color = text_color, hjust = 0.5, size = 24, face = "bold"),
+    plot.subtitle = element_text(color = text_color, hjust = 0.5, size = 16, face = "italic"),
+    plot.caption = element_textbox(color = text_color, hjust = 0.5, size = 12),
     legend.text = element_text(color = text_color),
     strip.text = element_text(color = text_color),
-    axis.text.y = element_text(color = text_color)
+    axis.text.y = element_text(color = text_color),
+    panel.grid = element_blank()
   )
 ```
 
