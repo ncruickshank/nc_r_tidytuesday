@@ -32,8 +32,11 @@ primetime and daytime entertainment programming, respectively.
 
 ``` r
 # libraries
+library(fontawesome)
+library(ggtext)
 library(hrbrthemes)
 library(readr)
+library(showtext)
 library(tidyverse)
 library(waffle)
 ```
@@ -60,14 +63,16 @@ head(nominees)
 
 ``` r
 # values
-
-## regexes
-outstanding_series_regex <- "^Outstanding*\\s*(Series|Program|Special)$" # needs some work
-
 ## lists
-top_streaming_services <- c("Netflix", "Hulu", "Prime Video",
-                            "Disney+", "HBO", "Paramount+",
-                            "Peacock", "Apple TV+")
+shows_of_interest <- c("The Daily Show With Jon Stewart", "Last Week Tonight With John Oliver",
+                       "The Late Show With Stephen Colbert", "The Colbert Report",
+                       "Late Show With David Letterman", "Jimmy Kimmel Live")
+
+hosts <- c("Jon Stewart", "John Oliver", "Stephen Colbert", "David Letterman", "Jimmy Kimmel")
+
+## colors
+text_color <- "#F4E265"
+background_color <- "#001397"
 ```
 
 ``` r
@@ -79,11 +84,6 @@ emmy <- nominees %>%
   mutate(
     category2 = str_to_title(str_remove(category, " - [0-9]{4}")),
     title = str_to_title(title),
-    distributor = case_when(
-      distributor == "HBO Max" ~ "HBO",
-      distributor %in% c("Amazon", "Amazon Instant Video") ~ "Prime Video",
-      TRUE ~ distributor
-    ),
     host = case_when(
       str_detect(title, "Jon Stewart") ~ "Jon Stewart",
       str_detect(title, "John Oliver") ~ "John Oliver",
@@ -93,26 +93,21 @@ emmy <- nominees %>%
     )
   )
 
-shows_of_interest <- c("The Daily Show With Jon Stewart", "Last Week Tonight With John Oliver",
-                       "The Late Show With Stephen Colbert", "The Colbert Report",
-                       "Late Show With David Letterman", "Jimmy Kimmel Live")
-
-hosts <- c("Jon Stewart", "John Oliver", "Stephen Colbert", "David Letterman", "Jimmy Kimmel")
-
+## create list of all categories our hosts have been considered for
 host_categories <- emmy %>%
   filter(!(is.na(host))) %>%
   distinct(category) %>%
   pull(category)
 
+## reshape df to identify who won each of those categories
 category_winners <- emmy %>%
-  filter(
-    category %in% host_categories,
-    type == "Winner"
-  ) %>%
+  filter(category %in% host_categories, type == "Winner") %>%
   mutate(winner = ifelse(host %in% hosts, host, "Other")) %>%
   distinct(category, winner)
 
+## create plotting df
 df <- emmy %>%
+  # create counts for other nominees in categories our hosts were considered for
   filter(category %in% host_categories) %>%
   mutate(host = ifelse(host %in% hosts, host, "Other")) %>%
   group_by(category) %>%
@@ -127,16 +122,11 @@ df <- emmy %>%
   ) %>%
   ungroup() %>%
   pivot_longer(cols = c(-category, -nominees)) %>%
+  # define whether or not the host in each row one the category
   left_join(category_winners, by = "category") %>%
   mutate(result = ifelse(name == winner & name != "Other", 1, 0)) %>%
-  separate(category, into = c("category", "year"), sep = " - ")
-```
-
-# Plot
-
-``` r
-# plot
-waffle <- df %>%
+  separate(category, into = c("category", "year"), sep = " - ") %>%
+  mutate(year = as.double(year)) %>%
   group_by(year, name) %>%
   dplyr::summarise(
     Nomination = sum(value) - sum(result),
@@ -144,42 +134,39 @@ waffle <- df %>%
   ) %>%
   ungroup() %>%
   pivot_longer(cols = c(-year, -name), names_to = "result", values_to = "n") %>%
-  mutate(
-    fill = factor(paste0(name, " - ", result), levels = c(
-      "Stephen Colbert - Win", "Stephen Colbert - Nomination",
-      "Jon Stewart - Win", "Jon Stewart - Nomination",
-      "John Oliver - Win", "John Oliver - Nomination",
-      "Jimmy Kimmel - Win", "Jimmy Kimmel - Nomination",
-      "David Letterman - Win", "David Letterman - Nomination",
-      "Other - Win", "Other - Nomination"
-    )),
-    year = as.double(year)
-  ) %>%
-  filter(
-    !(is.na(n)), !(is.na(year)),
-    year != 2001
-  )
+  filter(!(is.na(n)), !(is.na(year)), year != 2001)
+```
 
-ggplot(waffle, aes(fill = fill, values = n)) + 
-  geom_waffle(color = "white", size = .5, n_rows = 10, flip = TRUE) +
+# Plot
+
+``` r
+df %>%
+  filter(name != "Other") %>% # this ultimately wound up being distracting to plot
+  ggplot(aes(fill = name, values = n)) + 
+  geom_waffle(aes(color = result), size = 0.75, n_rows = 5, flip = TRUE, height = 0.9, width = 0.9) +
   facet_wrap(~ year, nrow = 1, strip.position = "bottom") + 
+  scale_color_manual(values = c(background_color, text_color), guide = "none") +
+  scale_fill_brewer(palette = "Dark2", name = NULL) +
   scale_x_discrete() + 
-  scale_y_continuous(labels = function(x) x * 10, # make this multiplyer the same as n_rows
-                     expand = c(0,0)) +
-  ggthemes::scale_fill_tableau(name=NULL) +
+  scale_y_continuous(labels = function(x) x * 5, expand = c(0,0)) +
   coord_equal() + 
   labs(
-    title = "Which Talk Show Hosts have the greatest success at the Emmy's?"
+    title = "Talk Show Host Emmy Nominations",
+    subtitle = "Highlighted cells represent wins.",
+    caption = "Data Source: <b>emmys.com</b> |  Visualization: <b>N. Cruickshank</b> | #TidyTuesday"
   ) +
   theme_minimal() + 
   theme(
-    legend.position = "bottom"
+    legend.position = "top",
+    plot.background = element_rect(fill = background_color),
+    plot.title = element_text(color = text_color, hjust = 0.5, size = 24, face = "bold"),
+    plot.subtitle = element_text(color = text_color, hjust = 0.5, size = 16, face = "italic"),
+    plot.caption = element_textbox(color = text_color, hjust = 0.5, size = 12),
+    legend.text = element_text(color = text_color),
+    strip.text = element_text(color = text_color),
+    axis.text.y = element_text(color = text_color),
+    panel.grid = element_blank()
   )
 ```
 
 ![](Emmy-Awards_files/figure-gfm/Talk%20Show%20Waffles-1.png)<!-- -->
-
-``` r
-# need to figure out a color schemes for each Talk Show Host (dark for wins, light for nominations)
-# also need to figure out if I want to keep the "Other" categories.
-```
