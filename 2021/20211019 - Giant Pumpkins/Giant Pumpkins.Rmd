@@ -1,0 +1,149 @@
+---
+title: "Giant Pumpkins"
+author: "Nick Cruickshank"
+date: "10/23/2021"
+output: 
+  github_document:
+    toc: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning=FALSE)
+```
+
+![](https://images.unsplash.com/photo-1539395369182-84bb72ecf742?ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&ixlib=rb-1.2.1&auto=format&fit=crop&w=1331&q=80)
+
+# Introduction
+
+Data for this weeks [Tidy Tuesday Project](https://github.com/rfordatascience/tidytuesday/tree/master/data/2021/2021-10-19) comes from [BigPunmpkins.com](http://www.bigpumpkins.com/ViewArticle.asp?id=132). 
+
+> The Great Pumpkin Commonwealth's (GPC) mission cultivates the hobby of growing giant pumpkins throughout the world by establishing standards and regulations that ensure quality of fruit, fairness of competition, recognition of achievement, fellowship and education for all participating growers and weigh-off sites.
+
+> Types: F = "Field Pumpkin", P = "Giant Pumpkin", S = "Giant Squash", W = "Giant Watermelon", L = "Long Gourd" (length in inches, not weight in pounds), T = Tomato
+
+More information on how to utilize this dataset (and understand the community) can be found in the [Great Pumpkin Commonwealth Handbook](https://gpc1.org/wp-content/uploads/2021/03/GPC-Rules-and-Handbook-2021.pdf).
+
+Image kudos to [Patrick Donnely](https://unsplash.com/@patrick).
+
+# Data Analyis
+
+## Libraries
+
+```{r libraries}
+# libraries
+library(forcats)
+library(ggridges)
+library(mapdata)
+library(maps)
+library(readr)
+library(sf)
+library(tidyverse)
+```
+
+## Data
+
+```{r load data}
+# data
+pumpkins <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-10-19/pumpkins.csv')
+head(pumpkins)
+```
+
+
+## Tidy
+
+Types: F = "Field Pumpkin", P = "Giant Pumpkin", S = "Giant Squash", W = "Giant Watermelon", L = "Long Gourd" (length in inches, not weight in pounds), T = Tomato
+
+```{r}
+pumpkins2 <- pumpkins %>%
+  filter(country == "United States") %>%
+  separate(id, into = c("year", "code"), sep = "-") %>%
+  mutate(
+    type = case_when(
+      str_detect(code, "F") ~ "Field Pumpkin",
+      str_detect(code, "P") ~ "Giant Pumpkin",
+      str_detect(code, "S") ~ "Giant Squash",
+      str_detect(code, "W") ~ "Giant Watermelon",
+      str_detect(code, "L") ~ "Long Gourd",
+      str_detect(code, "T") ~ "Tomato"
+    )
+  ) %>%
+  mutate(
+    year = as.numeric(year),
+    weight_lbs = parse_number(weight_lbs)
+  )
+  
+
+```
+
+
+## Visualization
+
+### Questions 
+
+Which states have the biggest pumpkins? By type? Over time?
+
+Which competitions have the biggest pumpkins?
+
+For the top 10 states, how has the timeline of growth changed?
+
+What is the different between field and giant pumpkins?
+
+__US Map connected to extra visualizations by geom sigmoid. ALso, which were the most popular gpc sites of 2021?__
+
+### Explroatory Data Analysis
+
+Field pumpkins and giant pumpkins have a __very__ different weight and distribution.
+
+```{r gourd type weight distr, fig.height=4, fig.width=10}
+# what type of gourd has the greatest weight?
+weight_orders <- pumpkins2 %>%
+  group_by(type) %>%
+  dplyr::summarise(mean_weight = mean(weight_lbs), n = n()) %>%
+  ungroup() %>%
+  mutate(rank = row_number()) %>%
+  arrange(desc(mean_weight))
+
+pumpkins2 %>%
+  left_join(weight_orders, by = "type") %>%
+  ggplot(aes(weight_lbs, fct_reorder(type, rank))) + 
+  geom_density_ridges(rel_min_height = 0.01)
+```
+
+Have the number of pumpkin submissions been going up or down? Is it reasonable to plot 2021?
+
+```{r year counts, fig.height=3, fig.width=10}
+pumpkins2 %>%
+  count(year) %>%
+  ggplot(aes(as.character(year), n)) + 
+  geom_bar(stat = "identity") + 
+  geom_text(aes(label = n), vjust = 1.2) + 
+  geom_text(aes(y = 200, label = year), fontface = "bold", size = 5, color = "white") + 
+  theme_void()
+```
+
+Looks like 2021 is good to plot!
+
+### Final Visualization
+
+States
+
+```{r}
+# states tidy
+pump_states <- pumpkins2 %>%
+  filter(year == 2021, type == "Giant Pumpkin")  %>%
+  group_by(state_prov) %>%
+  dplyr::summarise(max_weight = max(weight_lbs)) %>%
+  ungroup() %>%
+  mutate(region = str_to_lower(state_prov))
+
+usa <- map_data('usa')
+state <- map_data('state')
+
+state %>%
+  left_join(pump_states, by = "region") %>%
+  ggplot(aes(long, lat, fill = max_weight, group = group)) + 
+  geom_polygon(color = "darkorange4") + 
+  scale_fill_gradient(low = "palegoldenrod", high = "darkorange2")
+```
+
+
