@@ -32,9 +32,13 @@ Image kudos to [Patrick Donnely](https://unsplash.com/@patrick).
 ```{r libraries}
 # libraries
 library(forcats)
+library(ggbump)
 library(ggridges)
+library(ggtext)
+library(glue)
 library(mapdata)
 library(maps)
+library(patchwork)
 library(readr)
 library(sf)
 library(tidyverse)
@@ -45,6 +49,7 @@ library(tidyverse)
 ```{r load data}
 # data
 pumpkins <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-10-19/pumpkins.csv')
+state_abr <- read_csv("state_abr.csv")
 head(pumpkins)
 ```
 
@@ -127,7 +132,7 @@ Looks like 2021 is good to plot!
 
 States
 
-```{r}
+```{r pumpkin plot, fig.height=4, fig.width=10}
 # states tidy
 pump_states <- pumpkins2 %>%
   filter(year == 2021, type == "Giant Pumpkin")  %>%
@@ -137,13 +142,104 @@ pump_states <- pumpkins2 %>%
   mutate(region = str_to_lower(state_prov))
 
 usa <- map_data('usa')
-state <- map_data('state')
+state <- map_data('state') %>%
+  left_join(pump_states, by = "region")
 
-state %>%
-  left_join(pump_states, by = "region") %>%
-  ggplot(aes(long, lat, fill = max_weight, group = group)) + 
-  geom_polygon(color = "darkorange4") + 
-  scale_fill_gradient(low = "palegoldenrod", high = "darkorange2")
+list_top_states <- pump_states %>%
+  arrange(desc(max_weight)) %>%
+  mutate(
+    rank = row_number(),
+    label = paste0(rank, ". ", str_to_title(region))
+  ) %>%
+  head(10)
+
+ends <- tibble(
+  label = pull(list_top_states, label),
+  xend = c(-30, -30, -30, -30, -30, -30, -30, -30, -30, -30),
+  yend = rev(seq(21, 50, 3))
+)
+
+state_sigmoids <- state %>%
+  group_by(region) %>%
+  dplyr::summarise(
+    x = mean(long),
+    y = mean(lat)
+  ) %>%
+  inner_join(list_top_states, by = "region") %>%
+  left_join(ends)
+  
+
+ggplot() + 
+  geom_polygon(data = state, aes(long, lat, fill = max_weight, group = group), color = "darkorange4") + 
+  geom_sigmoid(data = state_sigmoids, aes(x = x, y = y, xend = xend, yend = yend, group = region), color = "darkorange4", size = 1.05) +
+  geom_point(data = state_sigmoids, aes(x, y), color = "darkorange4") + 
+  geom_text(data = state_sigmoids, aes(x = xend + 5, y = yend, label = label), color = "darkorange4", hjust = 0) + 
+  scale_fill_gradient(low = "palegoldenrod", high = "darkorange2", na.value = "grey80") + 
+  #scale_color_gradient(low = "darkorange2", high = "darkorange4") + 
+  scale_x_continuous(limits = c(-130, -15)) +
+  coord_fixed() + 
+  theme_void() + 
+  theme(
+    legend.position = "none"
+  )
 ```
 
+```{r weight boxplots, fig.height=8, fig.width=10}
+# boxplots
+overall_yends <- tibble(
+  overall_rank = seq(1, 30, 1),
+  yend = seq(0.5, 10.36, 0.34)
+)
+
+#pump_slice <- 
+pumpkins2 %>%
+  filter(
+    state_prov %in% list_top_states$state_prov,
+    year == 2021
+  ) %>%
+  group_by(state_prov) %>%
+  slice_max(order_by = weight_lbs, n = 3) %>%
+  mutate(state_rank = row_number()) %>%
+  ungroup() %>%
+  left_join(state_abr, by = "state_prov") %>%
+  arrange(desc(weight_lbs)) %>%
+  mutate(overall_rank = row_number()) %>%
+  select(state_prov, state_rank, overall_rank, grower_name, gpc_site, weight_lbs, abr) %>%
+  left_join(select(state_sigmoids, state_prov, rank, max_weight), by = "state_prov") %>%
+  mutate(
+    odd_even = if_else(rank %% 2 == TRUE, "Odd", "Even"),
+    xlab = max(max_weight) + 150,
+    ylab = case_when(
+      as.double(state_rank) == 1 ~ as.double(rank) - 0.3,
+      as.double(state_rank) == 2 ~ as.double(rank),
+      as.double(state_rank) == 3 ~ as.double(rank) + 0.3
+    ),
+    label1 = paste0("#", state_rank, " ", gpc_site),
+    x = max(state_sigmoids$max_weight) + 5500,
+    y = ylab,
+    xend = max(state_sigmoids$max_weight) + 10000,
+    label2 = paste0("#", overall_rank, " ", weight_lbs, "lbs (", abr, ")")
+  ) %>%
+  left_join(overall_yends, by = "overall_rank")
+
+
+pumpkins2 %>%
+  filter(
+    state_prov %in% list_top_states$state_prov,
+    year == 2021
+  ) %>%
+  left_join(select(pump_slice, state_prov, rank), by = "state_prov") %>%
+  ggplot(aes(weight_lbs, -rank)) + # fct_reorder(state_prov, rank, .desc = TRUE))) + 
+  geom_boxplot(aes(group = rank), width = 0.25, fill = "darkorange2", color = "darkorange4") + 
+  #scale_x_continuous(limits = c(0, max(state_sigmoids$max_weight) + 15000)) +
+  geom_text(data = pump_slice, aes(x = xlab, y = -ylab, label = label1, color = odd_even), hjust = 0, size = 3) + 
+  geom_sigmoid(data = pump_slice, aes(x = x, y = -y, xend = xend, yend = -yend, color = odd_even, group = overall_rank)) + 
+  scale_color_manual(values = c("darkorange4", "forestgreen"), guide = "none") + 
+  theme_minimal()
+```
+
+```{r}
+# patchwork vis
+
+```
 
