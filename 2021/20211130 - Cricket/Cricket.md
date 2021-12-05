@@ -1,29 +1,70 @@
----
-title: "Cricket"
-author: "Nick Cruickshank"
-date: "12/4/2021"
-output: 
-  github_document:
-    toc: true
----
+Cricket
+================
+Nick Cruickshank
+12/4/2021
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning=FALSE)
-```
+-   [Introduction](#introduction)
+-   [Analysis](#analysis)
+    -   [EDA](#eda)
+        -   [Most Represented Teams](#most-represented-teams)
+        -   [Distribution of Scores](#distribution-of-scores)
+        -   [Which teams have the highest win
+            rate?](#which-teams-have-the-highest-win-rate)
+        -   [Is the player of the match more often on the winnning team,
+            or the losing
+            team?](#is-the-player-of-the-match-more-often-on-the-winnning-team-or-the-losing-team)
+        -   [When and where do most games
+            happen?](#when-and-where-do-most-games-happen)
+    -   [Tidy](#tidy)
+    -   [Visualization](#visualization)
 
 # Introduction
 
-This week's [Tidy Tuesday Project](https://github.com/rfordatascience/tidytuesday/tree/master/data/2021/2021-11-30) features data about [Cricket](https://en.wikipedia.org/wiki/Cricket) from [ESPN Cricket](https://www.espncricinfo.com/).
+This week’s [Tidy Tuesday
+Project](https://github.com/rfordatascience/tidytuesday/tree/master/data/2021/2021-11-30)
+features data about [Cricket](https://en.wikipedia.org/wiki/Cricket)
+from [ESPN Cricket](https://www.espncricinfo.com/).
 
-> Cricket is a bat-and-ball game played between two teams of eleven players on a field at the centre of which is a 22-yard (20-metre) pitch with a wicket at each end, each comprising two bails balanced on three stumps. The game proceeds when a player on the fielding team, called the bowler, "bowls" (propels) the ball from one end of the pitch towards the wicket at the other end. The batting side's players score runs by striking the bowled ball with a bat and running between the wickets, while the bowling side tries to prevent this by keeping the ball within the field and getting it to either wicket, and dismiss each batter (so they are "out"). Means of dismissal include being bowled, when the ball hits the stumps and dislodges the bails, and by the fielding side either catching a hit ball before it touches the ground, or hitting a wicket with the ball before a batter can cross the crease line in front of the wicket to complete a run. When ten batters have been dismissed, the innings ends and the teams swap roles. The game is adjudicated by two umpires, aided by a third umpire and match referee in international matches.
+> Cricket is a bat-and-ball game played between two teams of eleven
+> players on a field at the centre of which is a 22-yard (20-metre)
+> pitch with a wicket at each end, each comprising two bails balanced on
+> three stumps. The game proceeds when a player on the fielding team,
+> called the bowler, “bowls” (propels) the ball from one end of the
+> pitch towards the wicket at the other end. The batting side’s players
+> score runs by striking the bowled ball with a bat and running between
+> the wickets, while the bowling side tries to prevent this by keeping
+> the ball within the field and getting it to either wicket, and dismiss
+> each batter (so they are “out”). Means of dismissal include being
+> bowled, when the ball hits the stumps and dislodges the bails, and by
+> the fielding side either catching a hit ball before it touches the
+> ground, or hitting a wicket with the ball before a batter can cross
+> the crease line in front of the wicket to complete a run. When ten
+> batters have been dismissed, the innings ends and the teams swap
+> roles. The game is adjudicated by two umpires, aided by a third umpire
+> and match referee in international matches.
 
-> A One Day International (ODI) is a form of limited overs cricket, played between two teams with international status, in which each team faces a fixed number of overs, currently 50, with the game lasting up to 9 hours.[1][2] The Cricket World Cup, generally held every four years, is played in this format. One Day International matches are also called Limited Overs Internationals (LOI), although this generic term may also refer to Twenty20 International matches. They are major matches and considered the highest standard of List A, limited-overs competition.
+> A One Day International (ODI) is a form of limited overs cricket,
+> played between two teams with international status, in which each team
+> faces a fixed number of overs, currently 50, with the game lasting up
+> to 9 hours.\[1\]\[2\] The Cricket World Cup, generally held every four
+> years, is played in this format. One Day International matches are
+> also called Limited Overs Internationals (LOI), although this generic
+> term may also refer to Twenty20 International matches. They are major
+> matches and considered the highest standard of List A, limited-overs
+> competition.
 
-> The Cricket World Cup (officially known as ICC Men's Cricket World Cup)[2] is the international championship of One Day International (ODI) cricket. The event is organised by the sport's governing body, the International Cricket Council (ICC), every four years, with preliminary qualification rounds leading up to a finals tournament. The tournament is one of the world's most viewed sporting events and is considered the "flagship event of the international cricket calendar" by the ICC
+> The Cricket World Cup (officially known as ICC Men’s Cricket World
+> Cup)\[2\] is the international championship of One Day International
+> (ODI) cricket. The event is organised by the sport’s governing body,
+> the International Cricket Council (ICC), every four years, with
+> preliminary qualification rounds leading up to a finals tournament.
+> The tournament is one of the world’s most viewed sporting events and
+> is considered the “flagship event of the international cricket
+> calendar” by the ICC
 
 # Analysis
 
-```{r libraries}
+``` r
 # libraries
 library(forcats)
 library(ggnetwork)
@@ -33,15 +74,30 @@ library(readr)
 library(tidyverse)
 ```
 
-```{r data}
+``` r
 # data
 matches <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-11-30/matches.csv')
 ```
 
-```{r}
+``` r
 # head
 head(matches)
 ```
+
+    ## # A tibble: 6 x 24
+    ##   match_id   team1        team2 score_team1 score_team2 wickets_team2 wickets_team
+    ##   <chr>      <chr>        <chr>       <dbl>       <dbl>         <dbl>        <dbl>
+    ## 1 ODI # 1028 West Indies  Aust~         172         173             9            9
+    ## 2 ODI # 1029 West Indies  Sri ~         194         124            10           10
+    ## 3 ODI # 1030 Sri Lanka    West~         102         104            10            3
+    ## 4 ODI # 1031 West Indies  Aust~         231         217            10           10
+    ## 5 ODI # 1032 Australia    Sri ~         213         214             5            7
+    ## 6 ODI # 1033 South Africa Engl~         211         205             8           10
+    ## # ... with 17 more variables: team1_away_or_home <chr>, team2_home_away <chr>,
+    ## #   winner <chr>, margin <dbl>, margin_type <chr>, time_of_day <chr>,
+    ## #   series <chr>, player_of_match <chr>, player_of_match_team <chr>,
+    ## #   venue <chr>, toss <chr>, toss_decision <chr>, ball_remaining <chr>,
+    ## #   ground <chr>, ground_city <chr>, ground_country <chr>, match_date <chr>
 
 ## EDA
 
@@ -49,7 +105,7 @@ head(matches)
 
 Pretty big cut off after the top 9 teams.
 
-```{r}
+``` r
 team_counts <- matches %>%
   select(team1, team2) %>%
   pivot_longer(cols = c("team1", "team2")) %>%
@@ -65,15 +121,25 @@ team_counts %>%
   labs(title = "Very big cutoff after top 11 teams")
 ```
 
+![](Cricket_files/figure-gfm/unnamed-chunk-2-1.png)<!-- -->
+
 ### Distribution of Scores
 
-```{r}
+``` r
 score_dist <- matches %>%
   select(score_team1, score_team2) %>%
   pivot_longer(cols = c("score_team1", "score_team2")) 
 
 shapiro.test(score_dist$value)
+```
 
+    ## 
+    ##  Shapiro-Wilk normality test
+    ## 
+    ## data:  score_dist$value
+    ## W = 0.99707, p-value = 0.0001127
+
+``` r
 score_dist %>%
   ggplot() + 
   geom_histogram(aes(value)) + 
@@ -83,9 +149,11 @@ score_dist %>%
   )
 ```
 
+![](Cricket_files/figure-gfm/unnamed-chunk-3-1.png)<!-- -->
+
 ### Which teams have the highest win rate?
 
-```{r}
+``` r
 matches %>%
   select(team1, team2, winner) %>%
   pivot_longer(cols = c("team1", "team2")) %>%
@@ -125,33 +193,62 @@ matches %>%
   )
 ```
 
+![](Cricket_files/figure-gfm/unnamed-chunk-4-1.png)<!-- -->
+
 ### Is the player of the match more often on the winnning team, or the losing team?
 
-Perhaps not surprisingly, the Player of the Match is most often on the winning team.
+Perhaps not surprisingly, the Player of the Match is most often on the
+winning team.
 
-```{r}
+``` r
 matches %>%
   select(winner, player_of_match_team) %>%
   mutate(disp = ifelse(winner == player_of_match_team, "Winner", "Loser")) %>%
   count(disp, sort = TRUE)
-``` 
+```
+
+    ## # A tibble: 2 x 2
+    ##   disp       n
+    ##   <chr>  <int>
+    ## 1 Winner  1150
+    ## 2 Loser     87
 
 ### When and where do most games happen?
 
-```{r}
+``` r
 matches %>%
   count(time_of_day, sort = TRUE)
 ```
 
-```{r}
+    ## # A tibble: 2 x 2
+    ##   time_of_day       n
+    ##   <chr>         <int>
+    ## 1 Day             721
+    ## 2 Day and night   516
+
+``` r
 matches %>%
   count(venue, sort = TRUE) %>%
   head(10)
 ```
 
+    ## # A tibble: 10 x 2
+    ##    venue                                     n
+    ##    <chr>                                 <int>
+    ##  1 Sharjah Cricket Association Stadium     101
+    ##  2 R Premadasa Stadium, Colombo             55
+    ##  3 Harare Sports Club                       49
+    ##  4 Bangabandhu National Stadium, Dhaka      46
+    ##  5 Gymkhana Club Ground, Nairobi            36
+    ##  6 Sinhalese Sports Club Ground, Colombo    36
+    ##  7 Sydney Cricket Ground                    33
+    ##  8 Melbourne Cricket Ground                 31
+    ##  9 Queens Sports Club, Bulawayo             31
+    ## 10 Gaddafi Stadium, Lahore                  28
+
 ## Tidy
 
-```{r tidy}
+``` r
 # tidy
 
 
@@ -199,7 +296,7 @@ network <- matches %>%
     margin_delta = abs(left - right),
     in_favor_of = ifelse(left - right > 0, team1, team2)
   ) %>%
-  #select(-left, -right) %>%
+  select(-left, -right) %>%
   left_join(select(team_coords, team1, coord), by = "team1") %>%
   rename(c("team1_coord" = "coord")) %>%
   left_join(select(team_coords, team2, coord), by = "team2") %>%
@@ -219,15 +316,17 @@ network <- matches %>%
   )
 ```
 
-Delta = the difference in the average margin when the left team wins as opposed to the average margin when the right team wins.
- - High Positive Value = Left wins by a wider margin when they win
- - High Negative Value = Right wins by a wider margin when they win
+Delta = the difference in the average margin when the left team wins as
+opposed to the average margin when the right team wins. - High Positive
+Value = Left wins by a wider margin when they win - High Negative Value
+= Right wins by a wider margin when they win
 
 ## Visualization
 
-Create a network plot where each node is a team and the edges are the average margin between those teams
+Create a network plot where each node is a team and the edges are the
+average margin between those teams
 
-```{r Cricket Network, fig.height=9, fig.width=8}
+``` r
 # network plot of teams
 network %>%
   ggplot() +
@@ -290,18 +389,4 @@ network %>%
   )
 ```
 
-```{r}
-network %>%
-  arrange(desc(margin_delta)) %>%
-  head(1) %>%
-  mutate(string = paste0("The greatest margin delta was seen in the ", pair, " pairing, where ", team2, " had a ", round(margin_delta), " point advantage over ", team1, "!")) %>%
-  pull(string)
-
-matches %>%
-  filter(
-    (team1 == "Bangladesh" & team2 == "New Zealand") | (team1 == "New Zealand" & team2 == "Bangladesh")
-  ) %>%
-  select(match_id, team1, team2, score_team1, score_team2, margin, winner)
-```
-
-
+![](Cricket_files/figure-gfm/Cricket%20Network-1.png)<!-- -->
