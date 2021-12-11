@@ -1,0 +1,221 @@
+---
+title: "Spiders"
+author: "Nick Cruickshank"
+date: "12/11/2021"
+output: 
+  github_document:
+    toc: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning=FALSE)
+```
+
+![](https://images.unsplash.com/photo-1532802245604-c567f1acd48e?ixlib=rb-1.2.1&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1543&q=80)
+
+# Introduction
+
+Data for this week's [Tidy Tuesday Project](https://github.com/rfordatascience/tidytuesday/tree/master/data/2021/2021-12-07) comes from the [World Spider Database](https://wsc.nmbe.ch/dataresources). 
+
+Image kudos to [Erop Kamelev](https://unsplash.com/@ekamelev)
+
+# Analysis
+
+```{r libraries}
+# libraries
+library(ggforce)
+library(ggtext)
+library(lubridate)
+library(readr)
+library(tidyverse)
+```
+
+```{r data} 
+# data
+spiders <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-12-07/spiders.csv')
+spiders
+```
+
+## Exploratory Analysis
+
+### Counts
+
+Family
+
+```{r}
+count(spiders, family, sort = TRUE) %>%
+  head(10)
+
+top_families <- count(spiders, family, sort = TRUE) %>%
+  head(10) %>%
+  pull(family)
+```
+
+Genus
+
+```{r}
+count(spiders, genus, sort = TRUE) %>%
+  head(10)
+```
+
+### Publications Over Time
+
+If you want to plot something over time, it may be more meaningful to rollup to the week level.
+
+```{r}
+spiders %>%
+  mutate(
+    family_category = ifelse(family %in% top_families, family, "Other"),
+    decade = year - year %% 10
+  ) %>%
+  count(family_category, decade) %>%
+  ggplot(aes(decade, n)) + 
+  geom_bar(aes(fill = family_category), stat = "identity")
+```
+
+## Studying Others Work
+
+Analysis inspired by [Ralitza Soultanova](https://github.com/RalitzaSoultanova/TidyTuesday_DataViz/blob/main/2021_w_50/Spiders.r)
+
+```{r}
+# # specific libraries
+# library(treemap)
+# library(data.tree)
+# library(DiagrammeR)
+# library(networkD3)
+# 
+# # data
+# spiders_Balkans <- filter(spiders, grepl("Bulgaria|Albania|Greece|Bosnia|Kosovo|Macedonia|Montenegro|Romania|Serbia", distribution))
+# 
+# # can be a mutate paste0() function
+# spiders_Balkans$pathString <- paste("spiders_Balkans", spiders_Balkans$family, spiders_Balkans$genus, sep = "/")
+# 
+# population <- as.Node(spiders_Balkans)
+# print(population, "species", limit = 50)
+# 
+# # define hierarchy (family / genus)
+# spiders_Balkans$pathString <- paste("Spiders", spiders_Balkans$family, spiders_Balkans$genus, sep = "|")
+# 
+# ## convert to node
+# spiders_Balkans <- as.Node(spiders_Balkans, pathDelimiter = "|")
+# useRtreeList <- ToListExplicit(spiders_Balkans, unname = TRUE)
+# 
+# radialNetwork(
+#   useRtreeList,
+#   fontSize = 7,
+#   fontFamily = "sans serif", linkColour = "#ccc", nodeColour = "#fff",
+#   nodeStroke = "steelblue", textColour = "#111", opacity = 1,
+#   margin = NULL
+# )
+```
+
+## Personal Analysis
+
+Inspiration from [Georgios Karamanis](https://twitter.com/geokaramanis/status/1469294223300173829).
+
+x-axis = date
+y-axis = 1 row per group (in his case, spider family, __129 families__)
+size of point = number of publications that year
+
+```{r}
+# tidy
+
+## clean up the distributions and separate rows
+spider_countries <- spiders %>%
+  select(family, genus, species, year, distribution) %>%
+  # clean up the distribution column
+  mutate(
+    ## make lower case for easier cleaning
+    country = str_to_lower(distribution),
+    country = str_remove(country, "introduced (to )?(both|the)?"), # remove this nonsense
+    country = str_remove(country, "\\(.*\\)"), # remove everything between brackets
+    country = str_replace(country, " (or|to) ", ", "), 
+    country = str_replace_all(country, " (and|and\\/or) ", ", "),
+    country = str_replace(country, "is\\.", "island"),
+    country = str_remove(country, "\\?"),
+    country = str_replace(country, "\\.", ","),
+    ## return to upper case before moving forward
+    country = str_to_title(country)
+  ) %>%
+  separate_rows(country, sep = ", ") %>%
+  # further cleaning after separate_rows()
+  mutate(
+    country = str_trim(country),
+    country = str_remove(country, "(\\?|,|\\.)"),
+    country = ifelse(str_detect(country, "Canary Is"), "Canary Island", country),
+    country = ifelse(str_detect(country, "Cape Verde"), "Cape Verde Island", country),
+    country = ifelse(str_detect(country, "Austral"), "Australia", country)
+  ) %>%
+  filter(
+    !(country %in% c("", "Europe", "Central Asia", "East Africa", "North America"))
+  )
+
+## create a list of countries to plot
+plottable_countries <- spider_countries %>%
+  count(country, sort = TRUE) %>%
+  filter(n >= 200) %>% # THIS CONTROLS HOW MANY PLOT ROWS
+  pull(country)
+
+## create the relevant families
+top_spider_families <- spider_countries %>%
+  count(family, sort = TRUE) %>%
+  head(3) %>% # THIS CONTROLS HOW MANY COLORS THERE ARE
+  pull(family)
+
+## create plottable dataframe
+spider_countries2 <- spider_countries %>%
+  filter(country %in% plottable_countries) %>%
+  mutate(family2 = ifelse(family %in% top_spider_families, family, "Other")) %>%
+  group_by(country) %>%
+  mutate(
+    min_year = min(year),
+    n_total = n()
+  ) %>%
+  ungroup() %>%
+  mutate(country = fct_reorder(country, min_year)) %>%
+  count(country, family2, n_total, min_year, year) %>%
+  mutate(
+    a_deg = as.numeric(country) * 2.7 + 8.5, # why? to define text label angle
+    a = a_deg * pi/180,
+    x = -(year - min(year) + 10) * cos(a + pi/2.07), # why?
+    y = (year - min(year) + 10) * sin(a + pi/2.07), # why?
+    label_a = ifelse(a_deg > 180, 270 - a_deg, 90 - a_deg),
+    h = ifelse(a_deg > 180, 1, 0),
+    label = ifelse(
+      h == 0,
+      paste0(country, " (", n_total, ")"),
+      paste0("(", n_total, ") ", country)
+    )
+  )
+
+## create years framework on which to plot
+years <- data.frame(
+  r = seq(
+    1760 - min(spider_countries2$year) + 10,
+    2020 - min(spider_countries2$year) + 10,
+    20
+  ),
+  l = seq(1760, 2020, 20)
+) %>%
+  mutate(lt = ifelse(row_number() %% 2 == 0, "dotted", "solid"))
+```
+
+```{r Spider Country Timeline, fig.height=10, fig.width=10}
+# plot
+spider_countries2 %>%
+  ggplot() + 
+  # year circles
+  geom_circle(data = years, aes(x0 = 0, y0 = 0, r = r, linetype = lt), size = 0.08, color = "grey50") + 
+  # year labels
+  geom_label(data = years, aes(x = 0, y = r, label = l), size = 3, label.padding = unit(0.25, "lines"), label.size = NA, fill = "grey95", color = "grey70") + 
+  # colored points THIS NEEDS TO BE SPREAD OUT MORE
+  geom_point(aes(x = x, y = y, size = n * 10), shape = 21, stroke = 0.15, fill = "forestgreen") + 
+  # country names and totals
+  geom_richtext(
+    aes(x = -305 * cos(a + pi/2.07), y = 305 * sin(a + pi/2.07), label = label, angle = label_a, hjust = h),
+    stat = "unique", size = 3.5, fill = NA, label.color = NA, color = "darkorange"
+  ) +
+  # annotations
+  annotate("text", 0, 293, label = "Total", color = "purple")
+```
+
