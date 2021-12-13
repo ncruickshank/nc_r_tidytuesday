@@ -1,27 +1,31 @@
----
-title: "Spiders"
-author: "Nick Cruickshank"
-date: "12/11/2021"
-output: 
-  github_document:
-    toc: true
----
+Spiders
+================
+Nick Cruickshank
+12/11/2021
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning=FALSE)
-```
+-   [Introduction](#introduction)
+-   [Analysis](#analysis)
+    -   [Exploratory Analysis](#exploratory-analysis)
+        -   [Counts](#counts)
+        -   [Publications Over Time](#publications-over-time)
+    -   [Studying Others Work](#studying-others-work)
+    -   [Visualization](#visualization)
+    -   [Inspirational Analysis](#inspirational-analysis)
 
 ![](https://images.unsplash.com/photo-1532802245604-c567f1acd48e?ixlib=rb-1.2.1&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1543&q=80)
 
 # Introduction
 
-Data for this week's [Tidy Tuesday Project](https://github.com/rfordatascience/tidytuesday/tree/master/data/2021/2021-12-07) comes from the [World Spider Database](https://wsc.nmbe.ch/dataresources). 
+Data for this week’s [Tidy Tuesday
+Project](https://github.com/rfordatascience/tidytuesday/tree/master/data/2021/2021-12-07)
+comes from the [World Spider
+Database](https://wsc.nmbe.ch/dataresources).
 
 Image kudos to [Erop Kamelev](https://unsplash.com/@ekamelev)
 
 # Analysis
 
-```{r libraries}
+``` r
 # libraries
 library(forcats)
 library(ggforce)
@@ -33,11 +37,27 @@ library(readr)
 library(tidyverse)
 ```
 
-```{r data} 
+``` r
 # data
 spiders <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-12-07/spiders.csv')
 spiders
 ```
+
+    ## # A tibble: 49,785 x 10
+    ##    speciesId species_lsid      family   genus  species  subspecies author   year
+    ##        <dbl> <chr>             <chr>    <chr>  <chr>    <chr>      <chr>   <dbl>
+    ##  1         1 urn:lsid:nmbe.ch~ Actinop~ Actin~ caraiba  <NA>       Simon    1889
+    ##  2         2 urn:lsid:nmbe.ch~ Actinop~ Actin~ crassip~ <NA>       Keyser~  1891
+    ##  3         3 urn:lsid:nmbe.ch~ Actinop~ Actin~ cucutae~ <NA>       Mello-~  1941
+    ##  4         4 urn:lsid:nmbe.ch~ Actinop~ Actin~ dubioma~ <NA>       Mello-~  1923
+    ##  5         5 urn:lsid:nmbe.ch~ Actinop~ Actin~ echinus  <NA>       Mello-~  1949
+    ##  6         6 urn:lsid:nmbe.ch~ Actinop~ Actin~ fractus  <NA>       Mello-~  1920
+    ##  7         7 urn:lsid:nmbe.ch~ Actinop~ Actin~ harti    <NA>       Pocock   1895
+    ##  8         8 urn:lsid:nmbe.ch~ Actinop~ Actin~ insignis <NA>       Holmbe~  1881
+    ##  9         9 urn:lsid:nmbe.ch~ Actinop~ Actin~ liodon   <NA>       Ausser~  1875
+    ## 10        10 urn:lsid:nmbe.ch~ Actinop~ Actin~ longipa~ <NA>       C. L. ~  1842
+    ## # ... with 49,775 more rows, and 2 more variables: parentheses <dbl>,
+    ## #   distribution <chr>
 
 ## Exploratory Analysis
 
@@ -45,10 +65,26 @@ spiders
 
 Family
 
-```{r}
+``` r
 count(spiders, family, sort = TRUE) %>%
   head(10)
+```
 
+    ## # A tibble: 10 x 2
+    ##    family          n
+    ##    <chr>       <int>
+    ##  1 Salticidae   6387
+    ##  2 Linyphiidae  4719
+    ##  3 Araneidae    3084
+    ##  4 Gnaphosidae  2583
+    ##  5 Theridiidae  2538
+    ##  6 Lycosidae    2440
+    ##  7 Thomisidae   2152
+    ##  8 Oonopidae    1888
+    ##  9 Pholcidae    1849
+    ## 10 Agelenidae   1350
+
+``` r
 top_families <- count(spiders, family, sort = TRUE) %>%
   head(10) %>%
   pull(family)
@@ -56,16 +92,31 @@ top_families <- count(spiders, family, sort = TRUE) %>%
 
 Genus
 
-```{r}
+``` r
 count(spiders, genus, sort = TRUE) %>%
   head(10)
 ```
 
+    ## # A tibble: 10 x 2
+    ##    genus           n
+    ##    <chr>       <int>
+    ##  1 Theridion     585
+    ##  2 Araneus       570
+    ##  3 Pardosa       535
+    ##  4 Clubiona      517
+    ##  5 Zelotes       396
+    ##  6 Pholcus       361
+    ##  7 Tetragnatha   323
+    ##  8 Dysdera       294
+    ##  9 Xysticus      293
+    ## 10 Oxyopes       290
+
 ### Publications Over Time
 
-If you want to plot something over time, it may be more meaningful to rollup to the week level.
+If you want to plot something over time, it may be more meaningful to
+rollup to the week level.
 
-```{r}
+``` r
 spiders %>%
   mutate(
     family_category = ifelse(family %in% top_families, family, "Other"),
@@ -76,11 +127,14 @@ spiders %>%
   geom_bar(aes(fill = family_category), stat = "identity")
 ```
 
+![](Spiders_files/figure-gfm/unnamed-chunk-3-1.png)<!-- -->
+
 ## Studying Others Work
 
-Analysis inspired by [Ralitza Soultanova](https://github.com/RalitzaSoultanova/TidyTuesday_DataViz/blob/main/2021_w_50/Spiders.r)
+Analysis inspired by [Ralitza
+Soultanova](https://github.com/RalitzaSoultanova/TidyTuesday_DataViz/blob/main/2021_w_50/Spiders.r)
 
-```{r}
+``` r
 # # specific libraries
 # library(treemap)
 # library(data.tree)
@@ -114,7 +168,7 @@ Analysis inspired by [Ralitza Soultanova](https://github.com/RalitzaSoultanova/T
 
 ## Visualization
 
-```{r}
+``` r
 # tidy
 
 ## clean up the distributions and separate rows
@@ -204,7 +258,7 @@ spiders_final <- spider_countries2 %>%
   )
 ```
 
-```{r Spider Time Ridges, fig.height=10, fig.width=6}
+``` r
 # colors
 areneidae_color <- "#B4B412"
 linyphiidae_color <- "#B46312"
@@ -240,11 +294,14 @@ spiders_final %>%
   )
 ```
 
+![](Spiders_files/figure-gfm/Spider%20Time%20Ridges-1.png)<!-- -->
+
 ## Inspirational Analysis
 
-Inspiration from [Georgios Karamanis](https://twitter.com/geokaramanis/status/1469294223300173829).
+Inspiration from [Georgios
+Karamanis](https://twitter.com/geokaramanis/status/1469294223300173829).
 
-```{r Spider Country Timeline, fig.height=10, fig.width=10}
+``` r
 # plot
 # spider_countries2 %>%
 #   ggplot() + 
