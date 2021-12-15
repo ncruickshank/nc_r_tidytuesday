@@ -1,0 +1,19 @@
+---
+title: "Spice Girls"
+author: "Nick Cruickshank"
+date: "12/15/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Introduction
+
+
+# Analysis
+
+## Idea
+
+Sentiment analysis for each spice girl thoughtout each of their records. Use a series of donut charts / pie charts for each spice girl as a legend.
