@@ -361,7 +361,7 @@ ggplot(spice_sentiment) +
   )
 ```
 
-![](Spice-Girls_files/figure-gfm/unnamed-chunk-4-1.png)<!-- -->
+![](Spice-Girls_files/figure-gfm/Spice%20Sentiments-1.png)<!-- -->
 
 ### Word Cloud
 
