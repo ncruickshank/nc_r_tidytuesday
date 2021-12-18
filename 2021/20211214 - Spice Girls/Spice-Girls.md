@@ -1,52 +1,131 @@
----
-title: "Spice Girls"
-author: "Nick Cruickshank"
-date: "12/15/2021"
-output: 
-  github_document:
-    toc: true
----
+Spice Girls
+================
+Nick Cruickshank
+12/15/2021
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
+-   [Introduction](#introduction)
+-   [Analysis](#analysis)
+    -   [Libraries and Data](#libraries-and-data)
+    -   [Lyrical Analysis](#lyrical-analysis)
+        -   [Sentiment](#sentiment)
+        -   [Word Cloud](#word-cloud)
 
 ![](https://www.thisdayinmusic.com/wp-content/uploads/1972/09/spice-girls.jpg)
 
 # Introduction
 
-This weeks [Tidy Tuesday Project](https://github.com/rfordatascience/tidytuesday/tree/master/data/2021/2021-12-14) comes from [Spotify](https://www.spotify.com/us/) and [Genius](https://genius.com/). 
+This weeks [Tidy Tuesday
+Project](https://github.com/rfordatascience/tidytuesday/tree/master/data/2021/2021-12-14)
+comes from [Spotify](https://www.spotify.com/us/) and
+[Genius](https://genius.com/).
 
 # Analysis
 
 ## Libraries and Data
 
-```{r libraries}
+``` r
 # libraries
 library(ggtext)
 library(readr)
 library(textdata)
 library(tidytext)
 library(tidyverse)
+```
+
+    ## -- Attaching packages --------------------------------------- tidyverse 1.3.1 --
+
+    ## v ggplot2 3.3.5     v dplyr   1.0.7
+    ## v tibble  3.1.6     v stringr 1.4.0
+    ## v tidyr   1.1.4     v forcats 0.5.1
+    ## v purrr   0.3.4
+
+    ## -- Conflicts ------------------------------------------ tidyverse_conflicts() --
+    ## x dplyr::filter() masks stats::filter()
+    ## x dplyr::lag()    masks stats::lag()
+
+``` r
 library(wordcloud)
 ```
 
-```{r data}
+    ## Loading required package: RColorBrewer
+
+``` r
 # data
 studio_album_tracks <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-12-14/studio_album_tracks.csv')
+```
 
+    ## Rows: 31 Columns: 25
+
+    ## -- Column specification --------------------------------------------------------
+    ## Delimiter: ","
+    ## chr   (9): artist_name, artist_id, album_id, track_id, track_name, album_nam...
+    ## dbl  (15): album_release_year, danceability, energy, key, loudness, mode, sp...
+    ## date  (1): album_release_date
+
+    ## 
+    ## i Use `spec()` to retrieve the full column specification for this data.
+    ## i Specify the column types or set `show_col_types = FALSE` to quiet this message.
+
+``` r
 lyrics <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-12-14/lyrics.csv')
 ```
 
-```{r}
+    ## Rows: 1885 Columns: 9
+
+    ## -- Column specification --------------------------------------------------------
+    ## Delimiter: ","
+    ## chr (6): artist_name, album_name, song_name, section_name, line, section_artist
+    ## dbl (3): track_number, song_id, line_number
+
+    ## 
+    ## i Use `spec()` to retrieve the full column specification for this data.
+    ## i Specify the column types or set `show_col_types = FALSE` to quiet this message.
+
+``` r
 studio_album_tracks
 ```
 
-```{r}
+    ## # A tibble: 31 x 25
+    ##    artist_name artist_id album_id album_release_d~ album_release_y~ danceability
+    ##    <chr>       <chr>     <chr>    <date>                      <dbl>        <dbl>
+    ##  1 Spice Girls 0uq5Pttq~ 4jbWZmf~ 2000-01-01                   2000        0.769
+    ##  2 Spice Girls 0uq5Pttq~ 4jbWZmf~ 2000-01-01                   2000        0.829
+    ##  3 Spice Girls 0uq5Pttq~ 4jbWZmf~ 2000-01-01                   2000        0.614
+    ##  4 Spice Girls 0uq5Pttq~ 4jbWZmf~ 2000-01-01                   2000        0.736
+    ##  5 Spice Girls 0uq5Pttq~ 4jbWZmf~ 2000-01-01                   2000        0.86 
+    ##  6 Spice Girls 0uq5Pttq~ 4jbWZmf~ 2000-01-01                   2000        0.798
+    ##  7 Spice Girls 0uq5Pttq~ 4jbWZmf~ 2000-01-01                   2000        0.671
+    ##  8 Spice Girls 0uq5Pttq~ 4jbWZmf~ 2000-01-01                   2000        0.571
+    ##  9 Spice Girls 0uq5Pttq~ 4jbWZmf~ 2000-01-01                   2000        0.709
+    ## 10 Spice Girls 0uq5Pttq~ 4jbWZmf~ 2000-01-01                   2000        0.536
+    ## # ... with 21 more rows, and 19 more variables: energy <dbl>, key <dbl>,
+    ## #   loudness <dbl>, mode <dbl>, speechiness <dbl>, acousticness <dbl>,
+    ## #   instrumentalness <dbl>, liveness <dbl>, valence <dbl>, tempo <dbl>,
+    ## #   track_id <chr>, time_signature <dbl>, duration_ms <dbl>, track_name <chr>,
+    ## #   track_number <dbl>, album_name <chr>, key_name <chr>, mode_name <chr>,
+    ## #   key_mode <chr>
+
+``` r
 lyrics
 ```
 
-```{r}
+    ## # A tibble: 1,885 x 9
+    ##    artist_name album_name track_number song_id song_name line_number
+    ##    <chr>       <chr>             <dbl>   <dbl> <chr>           <dbl>
+    ##  1 Spice Girls Spice                 1   89740 Wannabe             1
+    ##  2 Spice Girls Spice                 1   89740 Wannabe             2
+    ##  3 Spice Girls Spice                 1   89740 Wannabe             3
+    ##  4 Spice Girls Spice                 1   89740 Wannabe             4
+    ##  5 Spice Girls Spice                 1   89740 Wannabe             5
+    ##  6 Spice Girls Spice                 1   89740 Wannabe             6
+    ##  7 Spice Girls Spice                 1   89740 Wannabe             7
+    ##  8 Spice Girls Spice                 1   89740 Wannabe             8
+    ##  9 Spice Girls Spice                 1   89740 Wannabe             9
+    ## 10 Spice Girls Spice                 1   89740 Wannabe            10
+    ## # ... with 1,875 more rows, and 3 more variables: section_name <chr>,
+    ## #   line <chr>, section_artist <chr>
+
+``` r
 # values
 
 ## colors
@@ -58,14 +137,14 @@ sporty_color <- "#eedc53"
 text_color <- "antiquewhite"
 ```
 
-
 ## Lyrical Analysis
 
 ### Sentiment
 
-Sentiment analysis for each spice girl thoughtout each of their records. Use a word cloud for each spice girl as a legend.
+Sentiment analysis for each spice girl thoughtout each of their records.
+Use a word cloud for each spice girl as a legend.
 
-```{r tidy}
+``` r
 # tidy data frame
 
 ## define album order
@@ -127,7 +206,13 @@ spice_sentiment <- spices %>%
       spice == "Sporty" ~ y + 0.3
     )
   ) 
+```
 
+    ## Joining, by = "word"
+
+    ## `summarise()` has grouped output by 'song_order', 'y', 'album_name', 'album_number', 'song_name', 'track_number'. You can override using the `.groups` argument.
+
+``` r
 ## spice titles
 spice_albums <- spices %>%
   filter(track_number == 1) %>%
@@ -137,7 +222,11 @@ spice_albums <- spices %>%
     y = y - 1.5,
     string = paste0(album_name, " (", album_release_year, ")")
   )
+```
 
+    ## Joining, by = "album_name"
+
+``` r
 ## average spice sentiment
 spice_stats <- spices %>%
   unnest_tokens(word, line) %>%
@@ -160,7 +249,11 @@ spice_stats <- spices %>%
     ymax = -4.7,
     adj_sent = x  + (avg_sent * ((xmax - xmin) / 10))
   )
+```
 
+    ## Joining, by = "word"
+
+``` r
 album_sentiments <- spices %>%
   unnest_tokens(word, line) %>%
   inner_join(get_sentiments("afinn")) %>%
@@ -171,7 +264,11 @@ album_sentiments <- spices %>%
   mutate(y = c(-0.5, 12.5, 25.5))
 ```
 
-```{r fig.height=12, fig.width=7}
+    ## Joining, by = "word"
+
+    ## `summarise()` has grouped output by 'album_number'. You can override using the `.groups` argument.
+
+``` r
 ggplot(spice_sentiment) + 
   
   # title
@@ -262,8 +359,9 @@ ggplot(spice_sentiment) +
     plot.background = element_rect(fill = "grey10"),
     plot.caption = element_textbox(hjust = 0.5, size = 8, color = text_color)
   )
-
 ```
+
+![](Spice-Girls_files/figure-gfm/unnamed-chunk-4-1.png)<!-- -->
 
 ### Word Cloud
 
