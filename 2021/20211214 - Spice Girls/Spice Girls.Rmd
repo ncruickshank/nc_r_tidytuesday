@@ -13,6 +13,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # Introduction
 
+This weeks [Tidy Tuesday Project](https://github.com/rfordatascience/tidytuesday/tree/master/data/2021/2021-12-14) comes from [Spotify](https://www.spotify.com/us/) and [Genius](https://genius.com/). 
 
 # Analysis
 
@@ -20,6 +21,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r libraries}
 # libraries
+library(ggtext)
 library(readr)
 library(textdata)
 library(tidytext)
@@ -51,7 +53,7 @@ ginger_color <- "#d12059"
 posh_color <- "#dee65b"
 scary_color <- "#2588ad"
 sporty_color <- "#eedc53"
-text_color <- "#370f4f"
+text_color <- "antiquewhite"
 ```
 
 
@@ -111,7 +113,7 @@ spice_sentiment <- spices %>%
   group_by(song_order, y, album_name, album_number, song_name, track_number, spice) %>%
   summarise(words = n(), sentiment = mean(value)) %>%
   mutate(method = "AFINN") %>%
-  filter(words >= 5) %>%
+  filter(words >= 1) %>%
   # create additional plotting coordinates
   mutate(
     adj_sent = ifelse(sentiment < 0, sentiment - 2, sentiment + 2),
@@ -153,12 +155,26 @@ spice_stats <- spices %>%
     xmin = seq(-4.8, 3.2, length.out = 5),
     xmax = seq(-3.2, 4.8, length.out = 5),
     ymin = -5.3,
-    ymax = -4.7
+    ymax = -4.7,
+    adj_sent = x  + (avg_sent * ((xmax - xmin) / 10))
   )
+
+album_sentiments <- spices %>%
+  unnest_tokens(word, line) %>%
+  inner_join(get_sentiments("afinn")) %>%
+  group_by(album_number, album_name) %>%
+  dplyr::summarise(avg_sent = mean(value)) %>%
+  ungroup() %>%
+  arrange(album_number) %>%
+  mutate(y = c(-0.5, 12.5, 25.5))
 ```
 
-```{r fig.height=12, fig.width=6}
+```{r fig.height=12, fig.width=7}
 ggplot(spice_sentiment) + 
+  
+  # title
+  annotate("text", x = 0, y = -11, label = "SPICE GIRLS", size = 12, fontface = "bold", color = text_color) + 
+  annotate("text", x = 0, y = -9, label = "Sentiment Analysis by Singer and Song", size = 8, fontface = "bold", color = text_color) + 
   
   # average spice sentiment
   annotate("text", x = c(-4, -2, 0, 2, 4), y = -6, size = 6, fontface = "bold",
@@ -167,31 +183,46 @@ ggplot(spice_sentiment) +
   geom_rect(
     data = spice_stats,
     aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax),
-    fill = "grey90", color = "black"
+    fill = "grey25", color = text_color
   ) +
-  geom_linerange(data = spice_stats, aes(x = x, ymin = ymin, ymax = ymax)) + 
-  annotate("text", x = seq(-4.8, 3.2, length.out = 5), y = -4.5, label = "-5", size = 2) +
-  annotate("text", x = c(-4, -2, 0, 2, 4), y = -4.5, label = "0", size = 2) +
-  annotate("text", x = seq(-3.2, 4.8, length.out = 5), y = -4.5, label = "5", size = 2) +
+  geom_linerange(data = spice_stats, aes(x = x, ymin = ymin, ymax = ymax), color = text_color) + 
+  annotate("text", x = seq(-4.8, 3.2, length.out = 5), y = -4.5, label = "-5", size = 2, color = text_color) +
+  annotate("text", x = c(-4, -2, 0, 2, 4), y = -4.5, label = "0", size = 2, color = text_color) +
+  annotate("text", x = seq(-3.2, 4.8, length.out = 5), y = -4.5, label = "5", size = 2, color = text_color) +
+  geom_linerange(data = spice_stats, aes(x = adj_sent, ymin = ymin, ymax = ymax, color = spice), size = 2) + 
+  geom_text(data = spice_stats, aes(x = adj_sent, y = -4.2, label = avg_sent, color = spice), size = 4, fontface = "bold", hjust = 0) + 
   
   # x axis set up
-  annotate("text", x = 0, y = -2, label = "Song-Spice\nSentiment", color = text_color, lineheight = 0.8) +
-  annotate("segment", x = -5, xend = -2, y = -2, yend = -2) +
-  annotate("point", x = seq(-5, -3, 1), y = -2, size = 8, shape = 21, size = 3, fill = "white") + 
-  annotate("text", x = seq(-5, -3, 1), y = -2, label = seq(-3, -1, 1)) + 
-  annotate("segment", x = 2, xend = 5, y = -2, yend = -2) +
-  annotate("point", x = seq(3, 5, 1), y = -2, size = 8, shape = 21, size = 3, fill = "white") + 
-  annotate("text", x = seq(3, 5, 1), y = -2, label = seq(1, 3, 1)) + 
+  ## left side
+  annotate("segment", x = -5, xend = -2, y = c(-0.5, 12.5, 25.5), yend = c(-0.5, 12.5, 25.5), color = text_color) +
+  annotate("segment", x = -2, xend = -2, y = c(-0.25, 12.25, 25.25), yend = c(-0.75, 12.75, 25.75), color = text_color) +
+  annotate("point", x = seq(-5, -3, 1), y = -0.5, size = 9, shape = 21, fill = "grey10", color = text_color) + 
+  annotate("point", x = seq(-5, -3, 1), y = 12.5, size = 9, shape = 21, fill = "grey10", color = text_color) + 
+  annotate("point", x = seq(-5, -3, 1), y = 25.5, size = 9, shape = 21, fill = "grey10", color = text_color) + 
+  annotate("text", x = seq(-5, -3, 1), y = -0.5, label = seq(-3, -1, 1), color = text_color) + 
+  annotate("text", x = seq(-5, -3, 1), y = 12.5, label = seq(-3, -1, 1), color = text_color) + 
+  annotate("text", x = seq(-5, -3, 1), y = 25.5, label = seq(-3, -1, 1), color = text_color) + 
+  ## right side
+  annotate("segment", x = 2, xend = 5, y = c(-0.5, 12.5, 25.5), yend = c(-0.5, 12.5, 25.5), color = text_color) +
+  annotate("segment", x = 2, xend = 2, y = c(-0.25, 12.25, 25.25), yend = c(-0.75, 12.75, 25.75), color = text_color) +
+  ### average sentiment
+  #geom_linerange(data = album_sentiments, aes(xmin = 2, xmax = avg_sent + 2, y = y), size = 3, color = text_color) + 
+  annotate("point", x = seq(3, 5, 1), y = -0.5, size = 9, shape = 21, fill = "grey10", color = text_color) + 
+  annotate("point", x = seq(3, 5, 1), y = 12.5, size = 9, shape = 21, fill = "grey10", color = text_color) + 
+  annotate("point", x = seq(3, 5, 1), y = 25.5, size = 9, shape = 21, fill = "grey10", color = text_color) + 
+  annotate("text", x = seq(3, 5, 1), y = -0.5, label = seq(1, 3, 1), color = text_color) + 
+  annotate("text", x = seq(3, 5, 1), y = 12.5, label = seq(1, 3, 1), color = text_color) + 
+  annotate("text", x = seq(3, 5, 1), y = 25.5, label = seq(1, 3, 1), color = text_color) + 
   
   # album labels
   ## album titles
-  geom_text(data = spice_albums, aes(x = 0, y = y, label = string), fontface = "bold", size = 6) + 
-  annotate("segment", x = -1.5, xend = 1.5, y = c(0.25, 13.25, 26.25), yend = c(0.25, 13.25, 26.25)) + 
+  geom_text(data = spice_albums, aes(x = 0, y = y, label = string), fontface = "bold", size = 6, color = text_color) + 
+  
 
   ## song titles
-  geom_text(data = distinct(spice_sentiment, song_name, y), aes(x = 0, y = y, label = song_name), size = 4) + 
-  geom_linerange(data = distinct(spice_sentiment, song_name, y), aes(xmin = -2.25, xmax = 2.25, y = y + 0.5), linetype = "dotted") + 
-  geom_linerange(data = distinct(spice_sentiment, song_name, y), aes(xmin = -2.25, xmax = 2.25, y = y - 0.5), linetype = "dotted") +
+  geom_text(data = distinct(spice_sentiment, song_name, y), aes(x = 0, y = y, label = song_name), size = 3.7, color = text_color) + 
+  geom_linerange(data = distinct(spice_sentiment, song_name, y), aes(xmin = -2.25, xmax = 2.25, y = y + 0.5), linetype = "dotted", color = text_color) + 
+  geom_linerange(data = distinct(spice_sentiment, song_name, y), aes(xmin = -2.25, xmax = 2.25, y = y - 0.5), linetype = "dotted", color = text_color) +
   
   # plot sentiment
   ## negative sentiment
@@ -206,8 +237,7 @@ ggplot(spice_sentiment) +
   ## positive sentiment
   geom_linerange(
     data = filter(spice_sentiment, sentiment > 0),
-    aes(xmin = 2, xmax = adj_sent, y = adj_y, group = spice, color = spice),
-    position = "dodge"
+    aes(xmin = 2, xmax = adj_sent, y = adj_y, group = spice, color = spice)
   ) + 
   geom_point(
     data = filter(spice_sentiment, sentiment > 0),
@@ -223,15 +253,16 @@ ggplot(spice_sentiment) +
     "Scary" = scary_color,
     "Sporty" = sporty_color
   )) +
+  labs(caption = "Data Source: <b>Spotify & Genius</b> |  Visualization: <b>N. Cruickshank</b> | #TidyTuesday") +
   theme_void() + 
   theme(
     legend.position = "none",
-    plot.background = element_rect(fill = "white")
+    plot.background = element_rect(fill = "grey10"),
+    plot.caption = element_textbox(hjust = 0.5, size = 8, color = text_color)
   )
 
 ```
 
-
-
-
 ### Word Cloud
+
+Alternative idea for a later date.
