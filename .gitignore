@@ -2,3 +2,6 @@
 .Rhistory
 .RData
 .Ruserdata
+.Renviron
+spotify_client_id.txt
+spotify_client_secret.txt
