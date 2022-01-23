@@ -1,0 +1,176 @@
+---
+title: "Chocolate Ratings"
+author: "Nick Cruickshank"
+date: "1/23/2022"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+![](https://149366112.v2.pressablecdn.com/wp-content/uploads/2014/05/Where_Chocolate_Comes_From_Imagicity_218.jpg)
+
+# Introduction
+
+
+
+# Analysis
+
+```{r}
+# libraries
+library(forcats)
+library(ggrepel)
+library(showtext)
+library(tidyverse)
+```
+
+```{r}
+# data
+chocolate <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2022/2022-01-18/chocolate.csv')
+```
+
+```{r}
+knitr::kable(head(chocolate))
+```
+
+## EDA
+
+```{r}
+paste0("Min Date: ", min(chocolate$review_date), " | Max Date: ", max(chocolate$review_date))
+```
+
+
+## Memorable Characteristics to Ratings
+
+Series of box plots of ratings by characteristic
+
+### Over Time
+
+```{r}
+# top descriptive words over time
+word_time <- chocolate %>%
+  separate_rows(most_memorable_characteristics, sep = ",") %>%
+  count(review_date, most_memorable_characteristics) %>%
+  group_by(review_date) %>%
+  slice_max(order_by = n, n = 3) %>%
+  ungroup() %>%
+  count(most_memorable_characteristics, sort = TRUE)
+```
+
+### Of Top Rated Chocolates
+
+```{r}
+# find the words with the highest ratings
+
+## define adjectives to be cut
+### note that these words should have a roughly neutral connotation
+blacklist_re <- "(rich |mild(ly)? |basic |red |bright |dark |deep |very |heavy |strong |few |late |high |brief |(slightly|sliglty) |long(\\s)?)"
+
+## define top words
+top_words <- chocolate %>%
+  separate_rows(most_memorable_characteristics, sep = ",") %>%
+  # find the core word in question
+  ## rename column of intesest for less typing
+  rename(c("trait"= "most_memorable_characteristics")) %>%
+  mutate(
+    trait = str_trim(trait),
+    trait = str_remove(trait, blacklist_re),
+    cocoa_percent = as.double(str_remove(cocoa_percent, "%"))
+  ) %>%
+  filter(trait != "") %>%
+  group_by(trait) %>%
+  dplyr::summarise(
+    n = n(),
+    mean_rating = mean(rating),
+    mean_cocoa = mean(cocoa_percent)
+  ) %>%
+  ungroup() %>%
+  # only take words that show up at a high enough clip
+  filter(n > 10) %>%
+  arrange(desc(mean_rating)) %>%
+  head(10)
+
+## create new data frame
+choc_words <- chocolate %>%
+  separate_rows(most_memorable_characteristics, sep = ",") %>%
+  # find the core word in question
+  ## rename column of intesest for less typing
+  rename(c("trait"= "most_memorable_characteristics")) %>%
+  mutate(
+    trait = str_trim(trait),
+    trait = str_remove(trait, blacklist_re),
+    cocoa_percent = as.double(str_remove(cocoa_percent, "%"))
+  ) %>%
+  inner_join(top_words, by = "trait") %>%
+  mutate(trait = str_to_title(trait))
+```
+
+```{r}
+# values
+
+## fonts
+font_add_google(name = "Lobster", family = "lobster")
+font_add_google(name = "Roboto", family = "roboto")
+showtext_auto()
+f1 <- "lobster"
+f2 <- "roboto"
+
+## colors
+chocolate_color <- "#8A3B1D"
+highlight_color <- "#E9EC48"
+background_color <- "#E2CEC7"
+text_color <- "#562512"
+```
+
+
+```{r Chocolate Words, fig.height=6, fig.width=6}
+# define outliers for further labeling
+choc_outliers <- choc_words %>%
+  filter(
+    ((trait == "Creamy") & (rating <= 2)) | ((trait == "Smooth") & (rating <= 2.5))
+  ) %>%
+  mutate(label = paste0(specific_bean_origin_or_bar_name, " by ", company_manufacturer, "\n", "Produced in ", company_location, " in ", review_date))
+
+choc_words %>%
+  ggplot() + 
+  geom_boxplot(
+    aes(rating, fct_reorder(trait, mean_rating), group = trait), 
+    fill = chocolate_color, color = text_color, size = 0.8, width = 0.6
+  ) + 
+  # labels
+  annotate("text", x = 1.5, y = "Balanced", 
+           label = "What words are used",
+           hjust = 0, color = text_color, family = f1, size = 8, fontface = "bold") +
+  annotate("text", x = 1.5, y = "Raspberry", 
+           label = "to describe the best",
+           hjust = 0, color = text_color, family = f1, size = 8, fontface = "bold") +
+  annotate("text", x = 1.5, y = "Blackberry", 
+           label = "Chocolates?",
+           hjust = 0, color = text_color, family = f1, size = 10, fontface = "bold") +
+  annotate("text", x = 1.5, y = "Complex", 
+           label = "If you want to make highly rated chocolate",
+           hjust = 0, color = text_color, family = f2, size = 3.5) +
+  annotate("text", x = 1.5, y = "Fig", 
+           label = "focus on a delicate balance of fruity flavors.",
+           hjust = 0, color = text_color, family = f2, size = 3.5) +
+  ggrepel::geom_text_repel(
+    data = choc_outliers,
+    aes(x = rating, y = trait, label = label),
+    lineheight = 0.8, color = text_color, family = f2, size = 2
+  ) +
+  # scales, themes, etc
+  scale_y_discrete(name = NULL, position = "right") + 
+  scale_x_continuous(name = "Rating") + 
+  theme(
+    axis.text = element_text(family = f1, color = text_color, size = 10),
+    axis.ticks = element_blank(),
+    axis.title.x = element_text(family = f1, color = text_color),
+    plot.background = element_rect(fill = background_color),
+    panel.background = element_rect(fill = background_color),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor.y = element_blank()
+  )
+```
