@@ -1,0 +1,189 @@
+Dog Breeds
+================
+Nick Cruickshank
+2/6/2022
+
+# Analysis
+
+## Libraries and Data
+
+``` r
+# library
+library(ggimage)
+library(ggtext)
+library(readr)
+library(showtext)
+library(sysfonts)
+library(tidyverse)
+```
+
+``` r
+# data
+breed_traits <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2022/2022-02-01/breed_traits.csv')
+trait_description <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2022/2022-02-01/trait_description.csv') %>%
+  janitor::clean_names()
+breed_rank_all <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2022/2022-02-01/breed_rank.csv')
+```
+
+## Dat Prep
+
+### Conistently top dog breeds
+
+``` r
+best_dog_breeds <- breed_rank_all %>%
+  filter(Breed %in% breed_traits$Breed) %>%
+  select(-links, -Image) %>%
+  pivot_longer(cols = -"Breed") %>%
+  mutate(
+    name = str_remove(name, " Rank")
+  ) %>%
+  group_by(Breed) %>%
+  dplyr::summarise(mean = sum(value)) %>%
+  ungroup() %>%
+  arrange(mean) %>%
+  head(10) %>%
+  pull(Breed)
+```
+
+### Top Traits of Top Dogs
+
+``` r
+breed_images <- breed_rank_all %>%
+  janitor::clean_names() %>%
+  select(breed, image)
+
+df_coords <- breed_rank_all %>%
+  filter(Breed %in% best_dog_breeds) %>%
+  select(-links, -Image) %>%
+  pivot_longer(cols = -"Breed") %>%
+  mutate(
+    name = str_remove(name, " Rank")
+  ) %>%
+  janitor::clean_names() %>%
+  group_by(breed) %>%
+  dplyr::summarise(mean = mean(value)) %>%
+  ungroup() %>%
+  arrange(mean) %>%
+  mutate(
+    rank = rank(mean),
+    x = rep(c(5,25), 5),
+    y = c(10,10,8,8,6,6,4,4,2,2),
+    x_title = x,
+    y_title = y + 1,
+    x_rank = x - 4,
+    y_rank = y
+  ) %>%
+  left_join(breed_images, by = "breed")
+
+df <- breed_traits %>%
+  filter(Breed %in% best_dog_breeds) %>%
+  pivot_longer(cols = c(-"Breed", -"Coat Type", -"Coat Length"),
+               names_to = "trait", values_to = "score") %>%
+  janitor::clean_names() %>%
+  group_by(breed) %>%
+  slice_max(n = 3, order_by = score, with_ties = FALSE) %>%
+  mutate(trait_rank = row_number()) %>%
+  ungroup() %>%
+  left_join(trait_description, by = "trait") %>%
+  left_join(breed_images, by = "breed") %>%
+  left_join(df_coords, by = c("breed", "image")) %>%
+  group_by(breed) %>%
+  mutate(
+    x_rank = x - 0.5,
+    x_trait_score = x + 3,
+    x_trait = x + 4,
+    y_trait = case_when(
+      trait_rank == 1 ~ y + 0.3,
+      trait_rank == 2 ~ y,
+      trait_rank == 3 ~ y - 0.3,
+    )
+  ) %>%
+  ungroup()
+```
+
+## Visualization
+
+``` r
+# values
+
+## fonts
+font_add_google(name = "Roboto", family = "roboto")
+showtext_auto()
+f1 <- "roboto"
+
+breed_rank_all
+```
+
+    ## # A tibble: 195 x 11
+    ##    Breed `2013 Rank` `2014 Rank` `2015 Rank` `2016 Rank` `2017 Rank` `2018 Rank`
+    ##    <chr>       <dbl>       <dbl>       <dbl>       <dbl>       <dbl>       <dbl>
+    ##  1 Retr~           1           1           1           1           1           1
+    ##  2 Fren~          11           9           6           6           4           4
+    ##  3 Germ~           2           2           2           2           2           2
+    ##  4 Retr~           3           3           3           3           3           3
+    ##  5 Bull~           5           4           4           4           5           5
+    ##  6 Pood~           8           7           8           7           7           7
+    ##  7 Beag~           4           5           5           5           6           6
+    ##  8 Rott~           9          10           9           8           8           8
+    ##  9 Poin~          13          12          11          11          10           9
+    ## 10 Dach~          10          11          13          13          13          12
+    ## # ... with 185 more rows, and 4 more variables: 2019 Rank <dbl>,
+    ## #   2020 Rank <dbl>, links <chr>, Image <chr>
+
+``` r
+ggplot() +
+  # title
+  annotate(
+    "text", x = 19, y = 12.5, 
+    label = "Top Traits of the Best Boys",
+    family = f1, size = 10, fontface = "bold", hjust = 0.5
+  ) +
+  annotate(
+    "text", x = 19, y = 11.75,
+    label = str_wrap("Overall rank defined by how consistently the breed ranked highly from 2013 to 2020", 50),
+    family = f1, size = 5, hjust = 0.5, lineheight = 0.8
+  ) +
+  labs(caption = "Data Source: <b>American  Kennel Club</b> |  Visualization: <b>N. Cruickshank</b> | #TidyTuesday") +
+  
+  # dog names and rank
+  geom_text(
+    data = df_coords,
+    aes(x = x_rank, y = y_rank, label = paste("Rank\n", rank)),
+    size = 5, hjust = 0.5, family = f1, fontface = "bold", lineheight = 0.8
+  ) +
+  geom_text(
+    data = df_coords,
+    aes(x = x_title, y = y_title, label = breed),
+    size = 5, hjust = 0.5, family = f1, fontface = "bold"
+  ) +
+  
+  # dog images
+  geom_point(data = df_coords, aes(x, y)) +
+  geom_image(
+    data = df_coords, 
+    aes(x = x, y = y, image = image),
+    size = 0.10, by = "width"
+  ) + 
+  
+  # trait details
+  geom_text(
+    data = df,
+    aes(x = x_trait_score, y = y_trait, label = score),
+    hjust = 0, size = 4, family = f1, fontface = "bold"
+  ) +
+  geom_text(
+    data = df,
+    aes(x = x_trait, y = y_trait, label = trait),
+    hjust = 0, size = 3, family = f1, fontface = "italic"
+  ) +
+  
+  # scales, themes, etc
+  scale_x_continuous(limits = c(-2, 40), expand = c(0, 0)) + 
+  scale_y_continuous(limits = c(1, 13), expand = c(0, 0)) + 
+  theme_void() + 
+  theme(
+    plot.caption = element_textbox(family = f1, hjust = 0.5, size = 7)
+  )
+```
+
+![](Dog-Breeds_files/figure-gfm/Dog%20Plot-1.png)<!-- -->
