@@ -1,0 +1,169 @@
+---
+title: "Freedom in the World"
+author: "Nick Cruickshank"
+date: "2/28/2022"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning=FALSE)
+```
+
+![https://unsplash.com/@christya_v](https://images.unsplash.com/photo-1516081073616-833a87ca7516?ixlib=rb-1.2.1&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=2080&q=80)
+
+# Introduction
+
+This week's [Tidy Tuesday Project](https://github.com/rfordatascience/tidytuesday/tree/master/data/2022/2022-02-22) features data from the [Freedom House](https://freedomhouse.org/reports/publication-archives) and the [United Nations](https://github.com/ArthurCheib/analytical-politics-project/blob/main/data/tidy-data-fh-un.csv) about __Freedom in the World__. 
+
+> Freedom in the World, Freedom House's flagship publication, is the standard-setting comparative assessment of global political rights and civil liberties. Published annually since 1972, the survey ratings and narrative reports on 195 countries and 15 related and disputed territories are used by policymakers, the media, international corporations, civic activists, and human rights defenders.
+
+# Analysis
+
+```{r}
+# libraries
+library(ggtext)
+library(glue)
+library(readr)
+library(showtext)
+library(sysfonts)
+library(tidyverse)
+```
+
+```{r}
+# data
+freedom <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2022/2022-02-22/freedom.csv') %>%
+  janitor::clean_names()
+```
+
+## Exploratory Data Analysis
+
+```{r}
+# values
+
+## fonts
+font_add_google("Bebas Neue")
+showtext_auto()
+f1 <- "Bebas Neue"
+
+## colors
+free_red <- "#F95532"
+free_light_red <- "#FDBFB2"
+free_blue <- "#32D6F9"
+free_light_blue <- "#B2F0FD"
+```
+
+```{r Pct Free Countries, fig.height=4, fig.width=8}
+freedom %>%
+  group_by(region_name, year) %>%
+  dplyr::summarise(
+    n = n(),
+    free = sum(status == "F")
+  ) %>%
+  ungroup() %>%
+  mutate(prop = free / n) %>%
+  ggplot(aes(year, prop)) + 
+  geom_line(aes(color = region_name)) + 
+  geom_point(aes(color = region_name))+
+  labs(
+    title = "Percent of Free Countries By Region",
+    color = "Region"
+  ) +
+  scale_x_continuous(name = "Year") + 
+  scale_y_continuous(name = NULL, labels = function(x) paste0(100 * x, "%")) +
+  theme_bw() + 
+  theme(
+    legend.position = "top",
+    plot.title = element_text(hjust = 0.5, family = f1, color = "grey90"),
+    legend.title = element_text(family = f1, color = "grey90"),
+    legend.text = element_text(family = f1, color = "grey90"),
+    legend.background = element_blank(),
+    legend.key = element_rect(fill = "grey10"),
+    axis.title = element_text(family = f1, color = "grey90"),
+    axis.text = element_text(family = f1, color = "grey90"),
+    plot.background = element_rect(fill = "grey10"),
+    panel.background = element_rect(fill = "grey10"),
+    panel.grid = element_line(color = "grey30")
+  )
+```
+
+__Idea:__ Same metric evaluation as above, except ggbump rank plot.  
+
+## Real Visualization
+
+Visualization inspired by [Freedom House](https://freedomhouse.org/reports/publication-archives). 
+
+```{r}
+# prepare the data for visualization
+freedom_yoy <- freedom %>%
+  group_by(region_name, country) %>%
+  mutate(change = cl - lag(cl, default = NA)) %>%
+  ungroup() %>%
+  group_by(region_name, year) %>%
+  dplyr::summarise(
+    n = n(),
+    improve = sum(change > 0, na.rm = TRUE),
+    decline = sum(change < 0, na.rm = TRUE)
+  ) %>%
+  ungroup() %>%
+  mutate(
+    improve_pct = improve / n,
+    decline_pct = -1 * (decline / n)
+  ) 
+
+free_labs <- freedom_yoy %>%
+  distinct(region_name, year) %>%
+  filter(year %% 5 == 0) %>%
+  mutate(lab = paste0("'", str_sub(as.character(year), -2)))
+```
+
+```{r Pct Change in Freedom, fig.height=12, fig.width=6}
+# plot the data
+freedom_yoy %>%
+  ggplot() + 
+  geom_hline(yintercept = 0, color = "grey50") + 
+  annotate("point", x = seq(1995, 2020, 5), y = 0, size = 10, color = "grey50") + 
+  geom_text(data = free_labs, aes(x = year, y = 0, label = lab), color = "grey10") +
+  
+  geom_linerange(aes(x = year, ymin = decline_pct, ymax = improve_pct), color = "white") + 
+  # increases
+  geom_point(
+    data = filter(freedom_yoy, improve_pct > 0.05),
+    aes(x = year, y = improve_pct),
+    color = free_blue, size = 4
+  ) + 
+  geom_text(
+    data = filter(freedom_yoy, improve_pct > 0.05),
+    aes(x = year, y = improve_pct, label = round(100 * improve_pct)),
+    color = free_blue, size = 4, vjust = -2
+  ) + 
+  
+  # decreases
+  geom_point(
+    data = filter(freedom_yoy, decline_pct < -0.05),
+    aes(x = year, y = decline_pct),
+    color = free_red, size = 4
+  ) + 
+  geom_text(
+    data = filter(freedom_yoy, decline_pct < -0.05),
+    aes(x = year, y = decline_pct, label = round(100 * -decline_pct)),
+    color = free_red, size = 4, vjust = 2
+  ) + 
+  
+  # scales, themes, etc
+  labs(
+    title = "Freedom in the World",
+    subtitle = glue("Percent of countries who <b style=color:'{free_blue}'>improved</b> or <b style=color:'{free_red}'>declined</b> year-over-year<br><br>"),
+    caption = "Data Source: <b>Freedom House & United Nations</b> |  Visualization: <b>N. Cruickshank</b> | #TidyTuesday"
+  ) +
+  facet_wrap(~ region_name, ncol = 1, scales = "free_y") +
+  scale_y_continuous(name = "Pct Change Year over Year", limits = c(-0.32, 0.32)) + 
+  theme_void() + 
+  theme(
+    strip.text = element_text(size = 20, color = "grey90", family = f1),
+    plot.background = element_rect(fill = "grey10"),
+    plot.title = element_textbox(family = f1, hjust = 0.5, color = "grey90", size = 24),
+    plot.subtitle = element_textbox(family = f1, hjust = 0.5, color = "grey90", size = 16),
+    plot.caption = element_textbox(family = f1, hjust = 0.5, color = "grey90", size = 8)
+  )
+  
+```
