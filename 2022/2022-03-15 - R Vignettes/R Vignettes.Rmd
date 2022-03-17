@@ -94,24 +94,48 @@ tv_months %>%
   geom_point(aes(color = package, size = n))
 ```
 
-```{r fig.height=4, fig.width=12}
+```{r}
 coords <- tibble(
   date = seq(min_date, max_date, "month"),
   month = month(date),
-  sin = sin(month)
+  sin = sin(month) / 2
 )
 
 tv_months2 <- tv_months %>%
   rename(c("date" = "month", "size" = "n"))
 
+package_circa <- tv_months %>%
+  group_by(package) %>%
+  dplyr::summarise(circa = year(min(month)))
+
 pacakge_legend <- tibble(
   package = tidyverse_packages,
-  date = seq(min_date + years(1), max_date - years(1), length.out = 8),
-  sin = 3,
-  ylab = 4,
-  size = 10
-)
-  
+) %>%
+  left_join(package_circa, by = "package") %>%
+  arrange(circa) %>%
+  mutate(
+    date = seq(min_date + years(1), max_date - years(1), length.out = 8),
+    sin = 2.75,
+    ylab = 3.5,
+    size = 15
+  )
+
+mode_package <- tv_months %>%
+  mutate(year = year(month)) %>%
+  filter(year != 2009) %>%
+  count(year, package) %>%
+  group_by(year) %>%
+  slice_max(order_by = n, n = 1, with_ties = FALSE) %>%
+  ungroup() %>%
+  mutate(
+    date = as.Date(paste0(year, "-01-01"), format = "%Y-%m-%d"),
+    y = 1.5
+  )
+```
+
+
+```{r fig.height=4, fig.width=12}
+# plot
 coords %>%
   left_join(tv_months2) %>%
   ggplot(aes(date, sin)) + 
@@ -127,9 +151,25 @@ coords %>%
     data = pacakge_legend,
     aes(date, ylab, label = package, color = package)
   ) +
+  geom_text(
+    data = pacakge_legend,
+    aes(date, y = 2, label = paste0("c. ", circa), color = package),
+    fontface = "italic"
+  ) +
+  
+  # winning packages
+  geom_line(
+    data = mode_package,
+    aes(date, y, color = package, group = package),
+    size = 2
+  ) +
+  geom_text(
+    data = filter(mode_package, year %% 2 == 0),
+    aes(x = date, y = 1, label = year)
+  ) +
   
   # scales, themes, etc
-  scale_y_continuous(limits = c(-2,4)) + 
+  scale_y_continuous(limits = c(-1,4)) + 
   scale_size_identity(guide = "none") +
   scale_color_manual(values = c(
     "dplyr" = dplyr_color,
