@@ -1,0 +1,148 @@
+---
+title: "R Vignettes"
+author: "Nick Cruickshank"
+date: "3/16/2022"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Introduction
+
+This weeks [Tidy Tuesday Project]() features data on R Vignettes compiled by [Robert Flight](https://github.com/rmflight/vignette_analysis). 
+
+# Analysis
+
+```{r}
+# libraries
+library(cowplot) # for draw_image()
+library(lubridate)
+library(readr)
+library(showtext)
+library(sysfonts)
+library(tidyverse)
+```
+
+```{r}
+# data
+#bioc <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2022/2022-03-15/bioc.csv')
+cran <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2022/2022-03-15/cran.csv')
+```
+
+```{r}
+tidyverse_packages <- c("ggplot2", "dplyr", "tidyr", "readr", "purrr", "tibble",
+                        "stringr", "forcats")
+```
+
+
+```{r}
+tv <- cran %>%
+  filter(package %in% tidyverse_packages) %>%
+  mutate(
+    date = as.Date(date, "%Y-%m-%d"),
+    month = floor_date(date, unit = "month"),
+    year = year(date)
+  ) %>%
+  filter(!(is.na(date)))
+
+tv_months <- tv %>%
+  group_by(package, month) %>%
+  dplyr::summarise(n = n())
+```
+
+## Visualize
+
+```{r}
+# images
+ggplot2_image <- "https://d33wubrfki0l68.cloudfront.net/2c6239d311be6d037c251c71c3902792f8c4ddd2/12f67/css/images/hex/ggplot2.png"
+dplyr_image <- "https://d33wubrfki0l68.cloudfront.net/621a9c8c5d7b47c4b6d72e8f01f28d14310e8370/193fc/css/images/hex/dplyr.png"
+tidyr_image <- "https://d33wubrfki0l68.cloudfront.net/476fa4025501dcec05be08248b32d390dd2337d5/574c6/css/images/hex/tidyr.png"
+readr_image <- "https://d33wubrfki0l68.cloudfront.net/c1c91484f898fe9d7d90a570900f1d5cd703fe2e/d7df4/css/images/hex/readr.png"
+purrr_image <- "https://d33wubrfki0l68.cloudfront.net/2d0701b616efa7435cd5a94e703baa595a4f9ed0/d41b9/css/images/hex/purrr.png"
+tibble_image <- "https://d33wubrfki0l68.cloudfront.net/c477d7eb7fdf2c3d75637cfe19ff4a4d0a107bcf/017d0/css/images/hex/tibble.png"
+stringr_image <- "https://d33wubrfki0l68.cloudfront.net/45fd04ad9cdb2159fea08d07dbc11e742d68e4e3/df327/css/images/hex/stringr.png"
+forcats_image <- "https://d33wubrfki0l68.cloudfront.net/412a6f14518ab633a94221dda7e16cf22e43a763/91620/css/images/hex/forcats.png"
+
+# colors
+ggplot2_color <- "red"
+dplyr_color <- "blue"
+tidyr_color <- "orange"
+readr_color <- "purple"
+purrr_color <- "yellow"
+tibble_color <- "green"
+stringr_color <- "brown"
+forcats_color <- "grey50"
+
+# values
+min_date <- min(tv_months$month)
+max_date <- max(tv_months$month)
+max_count <- max(tv_months$n)
+```
+
+```{r}
+p1 <- qplot(Sepal.Length, Sepal.Width, data = iris)
+p1 + 
+  draw_image(forcats_image, x = 4, y = 2, width = 1, height = 1)
+```
+
+```{r}
+tv_months %>%
+  mutate(y = 1) %>%
+  ggplot(aes(month, package)) + 
+  geom_point(aes(color = package, size = n))
+```
+
+```{r fig.height=4, fig.width=12}
+coords <- tibble(
+  date = seq(min_date, max_date, "month"),
+  month = month(date),
+  sin = sin(month)
+)
+
+tv_months2 <- tv_months %>%
+  rename(c("date" = "month", "size" = "n"))
+
+pacakge_legend <- tibble(
+  package = tidyverse_packages,
+  date = seq(min_date + years(1), max_date - years(1), length.out = 8),
+  sin = 3,
+  ylab = 4,
+  size = 10
+)
+  
+coords %>%
+  left_join(tv_months2) %>%
+  ggplot(aes(date, sin)) + 
+  geom_line() + 
+  geom_jitter(aes(color = package, size = size * 2)) + 
+  
+  # legend
+  geom_point(
+    data = pacakge_legend,
+    aes(date, sin, size = size, color = package)
+  ) +
+  geom_text(
+    data = pacakge_legend,
+    aes(date, ylab, label = package, color = package)
+  ) +
+  
+  # scales, themes, etc
+  scale_y_continuous(limits = c(-2,4)) + 
+  scale_size_identity(guide = "none") +
+  scale_color_manual(values = c(
+    "dplyr" = dplyr_color,
+    "ggplot2" = ggplot2_color,
+    "readr" = readr_color,
+    "tibble" = tibble_color,
+    "forcats" = forcats_color,
+    "purrr" = purrr_color,
+    "stringr" = stringr_color,
+    "tidyr" = tidyr_color
+  ), guide = "none") +
+  theme(
+    legend.position = "top"
+  )
+```
+
