@@ -1,44 +1,92 @@
----
-title: "R Vignettes"
-author: "Nick Cruickshank"
-date: "3/17/2022"
-output: github_document
----
-
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
+R Vignettes
+================
+Nick Cruickshank
+3/17/2022
 
 # Introduction
 
-This weeks [Tidy Tuesday Project](https://github.com/rfordatascience/tidytuesday/tree/master/data/2022/2022-03-15) features data on R Vignettes compiled by [Robert Flight](https://github.com/rmflight/vignette_analysis). 
+This weeks [Tidy Tuesday
+Project](https://github.com/rfordatascience/tidytuesday/tree/master/data/2022/2022-03-15)
+features data on R Vignettes compiled by [Robert
+Flight](https://github.com/rmflight/vignette_analysis).
 
 # Analysis
 
-```{r}
+``` r
 # libraries
 library(cowplot) # for draw_image()
+```
+
+    ## Warning: package 'cowplot' was built under R version 4.1.3
+
+``` r
 library(ggtext)
 library(lubridate)
+```
+
+    ## 
+    ## Attaching package: 'lubridate'
+
+    ## The following object is masked from 'package:cowplot':
+    ## 
+    ##     stamp
+
+    ## The following objects are masked from 'package:base':
+    ## 
+    ##     date, intersect, setdiff, union
+
+``` r
 library(readr)
 library(showtext)
+```
+
+    ## Loading required package: sysfonts
+
+    ## Loading required package: showtextdb
+
+``` r
 library(sysfonts)
 library(tidyverse)
 ```
 
-```{r}
+    ## -- Attaching packages --------------------------------------- tidyverse 1.3.1 --
+
+    ## v ggplot2 3.3.5     v dplyr   1.0.7
+    ## v tibble  3.1.6     v stringr 1.4.0
+    ## v tidyr   1.1.4     v forcats 0.5.1
+    ## v purrr   0.3.4
+
+    ## -- Conflicts ------------------------------------------ tidyverse_conflicts() --
+    ## x lubridate::as.difftime() masks base::as.difftime()
+    ## x lubridate::date()        masks base::date()
+    ## x dplyr::filter()          masks stats::filter()
+    ## x lubridate::intersect()   masks base::intersect()
+    ## x dplyr::lag()             masks stats::lag()
+    ## x lubridate::setdiff()     masks base::setdiff()
+    ## x lubridate::stamp()       masks cowplot::stamp()
+    ## x lubridate::union()       masks base::union()
+
+``` r
 # data
 #bioc <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2022/2022-03-15/bioc.csv')
 cran <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2022/2022-03-15/cran.csv')
 ```
 
-```{r}
+    ## Rows: 109408 Columns: 5
+    ## -- Column specification --------------------------------------------------------
+    ## Delimiter: ","
+    ## chr (3): package, version, date
+    ## dbl (2): rnw, rmd
+    ## 
+    ## i Use `spec()` to retrieve the full column specification for this data.
+    ## i Specify the column types or set `show_col_types = FALSE` to quiet this message.
+
+``` r
 tidyverse_packages <- c("ggplot2", "dplyr", "tidyr", "readr", "purrr", "tibble",
                         "stringr", "forcats")
 ```
 
-
-```{r}
+``` r
 tv <- cran %>%
   filter(package %in% tidyverse_packages) %>%
   mutate(
@@ -53,9 +101,12 @@ tv_months <- tv %>%
   dplyr::summarise(n = n())
 ```
 
+    ## `summarise()` has grouped output by 'package'. You can override using the
+    ## `.groups` argument.
+
 ## Visualize
 
-```{r}
+``` r
 # images
 ggplot2_image <- "https://d33wubrfki0l68.cloudfront.net/2c6239d311be6d037c251c71c3902792f8c4ddd2/12f67/css/images/hex/ggplot2.png"
 dplyr_image <- "https://d33wubrfki0l68.cloudfront.net/621a9c8c5d7b47c4b6d72e8f01f28d14310e8370/193fc/css/images/hex/dplyr.png"
@@ -88,7 +139,7 @@ showtext_auto()
 f1 <- "Kanit"
 ```
 
-```{r}
+``` r
 coords <- tibble(
   date = seq(min_date, max_date, "month"),
   month = month(date),
@@ -127,8 +178,7 @@ mode_package <- tv_months %>%
   )
 ```
 
-
-```{r fig.height=4, fig.width=12}
+``` r
 # plot
 vignette_plot <- coords %>%
   left_join(tv_months2) %>%
@@ -195,9 +245,20 @@ vignette_plot <- coords %>%
   )
 ```
 
-```{r R Vignette Timeline, fig.height=4, fig.width=12}
-library(ggimage)
+    ## Joining, by = "date"
 
+``` r
+library(ggimage)
+```
+
+    ## 
+    ## Attaching package: 'ggimage'
+
+    ## The following object is masked from 'package:cowplot':
+    ## 
+    ##     theme_nothing
+
+``` r
 images <- tibble(
   package = tidyverse_packages,
   image = c(
@@ -207,8 +268,11 @@ images <- tibble(
 ) %>%
   left_join(pacakge_legend) %>%
   select(date, sin, package, image, size )
+```
 
+    ## Joining, by = "package"
 
+``` r
 vignette_plot + 
   geom_image(
     data = images,
@@ -217,3 +281,6 @@ vignette_plot +
   )
 ```
 
+    ## Warning: Removed 57 rows containing missing values (geom_point).
+
+![](R-Vignettes_files/figure-gfm/R%20Vignette%20Timeline-1.png)<!-- -->
