@@ -1,0 +1,50 @@
+---
+title: "Baby Names"
+author: "Nick Cruickshank"
+date: "3/21/2022"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Introduction
+
+
+# Analysis
+
+```{r}
+# libraries
+library(readr)
+library(tidyverse)
+```
+
+```{r}
+# data
+babynames <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2022/2022-03-22/babynames.csv')
+```
+
+## Visualization
+
+Change in length of name length (number of characters) over time. 
+
+Lessons Learned: Max char_count by year and sex winds up being a meaningless (no change) story.
+
+```{r}
+bn <- babynames %>%
+  mutate(char_count = str_length(name)) %>%
+  group_by(year, sex, char_count) %>%
+  dplyr::summarise(n2 = sum(n)) %>%
+  group_by(year, sex) %>%
+  dplyr::summarise(
+    avg_name_length = weighted.mean(x = char_count, w = n2)
+  ) %>%
+  ungroup() 
+
+bn %>%
+  ggplot(aes(year, avg_name_length)) + 
+  geom_point(aes(color = sex)) + 
+  labs(title = "Average name length dramatically increased in the 1980s")
+```
+
