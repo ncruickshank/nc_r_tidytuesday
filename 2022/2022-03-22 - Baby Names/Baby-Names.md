@@ -1,37 +1,57 @@
----
-title: "Baby Names"
-author: "Nick Cruickshank"
-date: "3/21/2022"
-output: github_document
----
-
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
+Baby Names
+================
+Nick Cruickshank
+3/21/2022
 
 # Analysis
 
-```{r}
+``` r
 # libraries
 library(ggtext)
 library(readr)
 library(tidyverse)
+```
+
+    ## -- Attaching packages --------------------------------------- tidyverse 1.3.1 --
+
+    ## v ggplot2 3.3.5     v dplyr   1.0.7
+    ## v tibble  3.1.6     v stringr 1.4.0
+    ## v tidyr   1.1.4     v forcats 0.5.1
+    ## v purrr   0.3.4
+
+    ## -- Conflicts ------------------------------------------ tidyverse_conflicts() --
+    ## x dplyr::filter() masks stats::filter()
+    ## x dplyr::lag()    masks stats::lag()
+
+``` r
 library(sysfonts)
 library(showtext)
 ```
 
-```{r}
+    ## Loading required package: showtextdb
+
+``` r
 # data
 babynames <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2022/2022-03-22/babynames.csv')
 ```
 
+    ## Rows: 1924665 Columns: 5
+    ## -- Column specification --------------------------------------------------------
+    ## Delimiter: ","
+    ## chr (2): sex, name
+    ## dbl (3): year, n, prop
+    ## 
+    ## i Use `spec()` to retrieve the full column specification for this data.
+    ## i Specify the column types or set `show_col_types = FALSE` to quiet this message.
+
 ## Visualization
 
-Change in length of name length (number of characters) over time. 
+Change in length of name length (number of characters) over time.
 
-Lessons Learned: Max char_count by year and sex winds up being a meaningless (no change) story.
+Lessons Learned: Max char_count by year and sex winds up being a
+meaningless (no change) story.
 
-```{r}
+``` r
 # values
 
 ## fonts
@@ -46,7 +66,7 @@ background_color <- "#81898E"
 text_color <- "#F2FCC8"
 ```
 
-```{r}
+``` r
 # default df for plotting
 bn <- babynames %>%
   mutate(char_count = str_length(name)) %>%
@@ -57,7 +77,12 @@ bn <- babynames %>%
     avg_name_length = weighted.mean(x = char_count, w = n2)
   ) %>%
   ungroup() 
+```
 
+    ## `summarise()` has grouped output by 'year', 'sex'. You can override using the `.groups` argument.
+    ## `summarise()` has grouped output by 'year'. You can override using the `.groups` argument.
+
+``` r
 # identify the most common baby names at peaks and valleys
 
 ## VALLEYS - years with lowest name length average
@@ -81,7 +106,11 @@ valley_names <- babynames %>%
   slice_max(order_by = n, n = 3) %>%
   ungroup() %>%
   select(year, sex, name, n)
+```
 
+    ## Joining, by = c("year", "sex")
+
+``` r
 valley_girls <- valley_names %>%
   filter(sex == "F") %>%
   pull(name) %>%
@@ -114,7 +143,11 @@ peaks_names <- babynames %>%
   slice_max(order_by = n, n = 3) %>%
   ungroup() %>%
   select(year, sex, name, n)
+```
 
+    ## Joining, by = c("year", "sex")
+
+``` r
 peak_girls <- peaks_names %>%
   filter(sex == "F") %>%
   pull(name) %>%
@@ -126,7 +159,7 @@ peak_boys <- peaks_names %>%
   glue::glue_collapse(sep = "\n")
 ```
 
-```{r Baby Name Length Over Time, fig.height=6, fig.width=10}
+``` r
 # plot
 bn %>%
   ggplot(aes(year, avg_name_length)) + 
@@ -182,3 +215,5 @@ bn %>%
     plot.caption = element_textbox(color = text_color, hjust = 0.5)
   )
 ```
+
+![](Baby-Names_files/figure-gfm/Baby%20Name%20Length%20Over%20Time-1.png)<!-- -->
