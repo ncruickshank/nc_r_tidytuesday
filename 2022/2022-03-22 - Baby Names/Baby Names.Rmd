@@ -16,8 +16,11 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r}
 # libraries
+library(ggtext)
 library(readr)
 library(tidyverse)
+library(sysfonts)
+library(showtext)
 ```
 
 ```{r}
@@ -32,6 +35,22 @@ Change in length of name length (number of characters) over time.
 Lessons Learned: Max char_count by year and sex winds up being a meaningless (no change) story.
 
 ```{r}
+# values
+
+## fonts
+font_add_google("Playfair Display")
+showtext_auto()
+f1 <- "Playfair Display"
+
+## colors
+baby_blue <- "#89cff0"
+baby_red <- "#fcd2c8"
+background_color <- "#81898E"
+text_color <- "#F2FCC8"
+```
+
+```{r}
+# default df for plotting
 bn <- babynames %>%
   mutate(char_count = str_length(name)) %>%
   group_by(year, sex, char_count) %>%
@@ -42,9 +61,133 @@ bn <- babynames %>%
   ) %>%
   ungroup() 
 
+# identify the most common baby names at peaks and valleys
+
+## VALLEYS - years with lowest name length average
+valleys <- bn %>%
+  filter(year >= 1920) %>%
+  group_by(sex) %>%
+  slice_min(avg_name_length, n = 1)
+
+valley_names <- babynames %>%
+  inner_join(valleys) %>%
+  mutate(
+    char_count = str_length(name),
+    lower_limit = floor(avg_name_length),
+    upper_limit = ceiling(avg_name_length)
+  ) %>%
+  filter(
+    #char_count >= lower_limit & char_count <= upper_limit
+    char_count == lower_limit
+  ) %>%
+  group_by(sex) %>%
+  slice_max(order_by = n, n = 3) %>%
+  ungroup() %>%
+  select(year, sex, name, n)
+
+valley_girls <- valley_names %>%
+  filter(sex == "F") %>%
+  pull(name) %>%
+  glue::glue_collapse(sep = "\n")
+
+valley_boys <- valley_names %>%
+  filter(sex == "M") %>%
+  pull(name) %>%
+  glue::glue_collapse(sep = "\n")
+
+## PEAKS - years with highest name length average
+peaks <- bn %>%
+  filter(year >= 1920) %>%
+  group_by(sex) %>%
+  slice_max(avg_name_length, n = 1)
+
+peaks_names <- babynames %>%
+  inner_join(peaks) %>%
+  mutate(
+    char_count = str_length(name),
+    lower_limit = floor(avg_name_length),
+    upper_limit = ceiling(avg_name_length),
+    limit = ifelse(sex == "F", ceiling(avg_name_length), floor(avg_name_length))
+  ) %>%
+  filter(
+    #char_count >= lower_limit & char_count <= upper_limit
+    char_count == limit
+  ) %>%
+  group_by(sex) %>%
+  slice_max(order_by = n, n = 3) %>%
+  ungroup() %>%
+  select(year, sex, name, n)
+
+peak_girls <- peaks_names %>%
+  filter(sex == "F") %>%
+  pull(name) %>%
+  glue::glue_collapse(sep = "\n")
+
+peak_boys <- peaks_names %>%
+  filter(sex == "M") %>%
+  pull(name) %>%
+  glue::glue_collapse(sep = "\n")
+```
+
+
+```{r Baby Name Length Over Time, fig.height=6, fig.width=10}
+# plot
 bn %>%
   ggplot(aes(year, avg_name_length)) + 
-  geom_point(aes(color = sex)) + 
-  labs(title = "Average name length dramatically increased in the 1980s")
+  geom_line(aes(color = sex), size = 1.1) + 
+  
+  # annotations
+  ## general plot annotations
+  annotate("text", x = 1885, y = 6.3,
+           label = "Average baby name length",
+           color = text_color, fontface = "bold", size = 10, hjust = 0) +
+  
+  ## girls details
+  annotate("text", x = max(bn$year) + 2, y = filter(bn, sex == "F", year == max(year))$avg_name_length,
+           label = "Girl", 
+           color = baby_red, fontface = "italic", size = 7, hjust = 0) +
+  annotate("text", x = 1959, y = 5.95, label = valley_girls,
+           color = baby_red, size = 4, hjust = 0.5) +
+  annotate("text", x = 1989, y = 6.5, label = peak_girls,
+           color = baby_red, size = 4, hjust = 0.5) +
+  
+  ## boys details
+  annotate("text", x = max(bn$year) + 2, y = filter(bn, sex == "M", year == max(year))$avg_name_length,
+           label = "Boy", 
+           color = baby_blue, fontface = "italic", size = 7, hjust = 0) +
+  annotate("text", x = 1959, y = 5.5, label = valley_boys,
+           color = baby_blue, size = 4, hjust = 0.5) +
+  annotate("text", x = 1989, y = 5.9, label = peak_boys,
+           color = baby_blue, size = 4, hjust = 0.5) +
+  
+  # scales, themes, etc
+  scale_x_continuous(name = "Year", expand = c(0,0), limits = c(min(bn$year), max(bn$year) + 12)) +
+  scale_y_continuous(name = "Number of Characters", expand = c(0,0), limits = c(min(bn$avg_name_length), max(bn$avg_name_length) + 0.2)) +
+  scale_color_manual(values = c(
+    "F" = baby_red,
+    "M" = baby_blue
+  ), guide = "none") +
+  labs(caption = "<br><br>Data Source: <b>babyname R Package</b> |  Visualization: <b>N. Cruickshank</b> | #TidyTuesday") +
+  theme_minimal(base_family = f1) + 
+  theme(
+    plot.background = element_rect(fill = background_color, color = background_color),
+    panel.background = element_rect(fill = background_color, color = background_color),
+    
+    panel.grid = element_line(color = "grey40"),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    
+    axis.text = element_text(color = text_color, size = 12),
+    axis.title = element_text(color = text_color, size = 14),
+    
+    plot.caption = element_textbox(color = text_color, hjust = 0.5)
+  )
+```
+
+```{r}
+bn %>%
+  filter(sex == "F", year == max(year))
+  
+filter(bn, sex == "F", year == max(year))$avg_name_length
 ```
 
