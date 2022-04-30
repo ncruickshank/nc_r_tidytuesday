@@ -137,13 +137,35 @@ Need to `install.packages("RSelenium")` and to have JAVA installed on the local 
 Selenium Tutorial provided by [Samer Hijjazi](https://www.youtube.com/watch?v=U1BrIPmhx10). 
 
 ```{r}
+## selenium libraries
 library(RSelenium)
 library(wdman)
 library(netstat)
 
+## create driver
 driver <- rsDriver(browser = "chrome",
-                   chromever = '100.0.4896.127',
+                   chromever = '100.0.4896.60',
                    verbose = FALSE,
                    port = free_port())
+
+## create client object
+remDr <- driver$client
+```
+
+```{r}
+test_url <- hidden_gems$notebook[1]
+tweet <- hidden_gems$author_twitter[1]
+
+# open browser
+remDr$open()
+
+# go to kaggle link
+remDr$navigate(tweet)
+
+# finding elements
+followers_xpath <- remDr$findElement(using = "xpath", '//*[@id="react-root"]/div/div/div[2]/main/div/div/div/div/div/div[2]/div/div/div/div[2]/div[5]/div[2]/a/span[1]/span')
+followers_xpath$getElementAttribute('name')
+
+remDr$close()
 ```
 
