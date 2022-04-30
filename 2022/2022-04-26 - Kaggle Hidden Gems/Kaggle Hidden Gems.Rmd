@@ -121,12 +121,29 @@ df <- data.frame(word = names(words), freq = words)
 ## set seed for reproducibility
 set.seed(1123)
 
-wordcloud(words = df$word, freq = df$freq, min.freg = 1,
+review_cloud <- wordcloud(words = df$word, freq = df$freq, min.freg = 1,
           max.words = 200, random.order = FALSE, rot.per = 0.25,
           colors = brewer.pal(8, "Dark2"))
 ```
 
 ```{r}
-wordcloud2(data = df, size = 0.7, shape = "pe ntagon")
+#wordcloud2(data = df, size = 0.7, shape = "pentagon")
+```
+
+## Selenium
+
+Need to `install.packages("RSelenium")` and to have JAVA installed on the local machine (a useful tutorial for downloading JAVA is provided by [ProgrammingKnowledge](https://www.youtube.com/watch?v=IJ-PJbvJBGs)).
+
+Selenium Tutorial provided by [Samer Hijjazi](https://www.youtube.com/watch?v=U1BrIPmhx10). 
+
+```{r}
+library(RSelenium)
+library(wdman)
+library(netstat)
+
+driver <- rsDriver(browser = "chrome",
+                   chromever = '100.0.4896.127',
+                   verbose = FALSE,
+                   port = free_port())
 ```
 
