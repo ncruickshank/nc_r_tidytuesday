@@ -1,0 +1,132 @@
+---
+title: "Kaggle Hidden Gems"
+author: "Nick Cruickshank"
+date: "4/30/2022"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning=FALSE)
+```
+
+# Introduction
+
+This weeks [Tidy Tuesday Project](https://github.com/rfordatascience/tidytuesday/tree/master/data/2022/2022-04-26) comes from the [Kaggle Notebooks of the Week - Hidden Gems](https://www.kaggle.com/datasets/headsortails/notebooks-of-the-week-hidden-gems?resource=download) project, which is celebrating it's 100th installment. 
+
+## Data Dictionary
+
+The file of interest is kaggle_hidden_gems.csv, containing the following columns:  
+ - `vol` and `date`: The consecutive number of the Hidden Gems episode and when it was first published.  
+ - `link_forum` and `link_twitter`: The hyperlinks to the Kaggle Forum post and Twitter post for the episode.  
+ - `notebook` and `author`: The hyperlinks to the Notebook itself, as well as to the Kaggle profile of the author.  
+ - `title`: The Notebook title as a string.  
+ - `review`: My brief review of the Notebook.  
+ - `author_name`: The name of the Notebook author as listed on their Kaggle profile at the time the episode was published.  
+ - `author_twitter` and author_linkedin: The social media links of the author, if listed on their Kaggle profile.  
+ - `notes`: Notes about special episodes.  
+
+# Analysis
+
+## Libraries and Data
+
+```{r libraries}
+# libraries
+library(lubridate)
+library(tidyverse)
+library(tm) # for converting text into corpus
+library(wordcloud)
+library(wordcloud2)
+```
+
+```{r}
+# data
+hidden_gems <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2022/2022-04-26/hidden_gems.csv')
+```
+
+## Tidy Data Set
+
+This data set contains a lot of useful references for authorship and links to follow for each notebook. However, for the sake of visualizing the metadata, we don't care quite as much about that.  
+
+```{r}
+hg <- hidden_gems %>%
+  select(date, author_kaggle, title, review)
+```
+
+
+## EDA
+
+Are there any authors that show up a lot?
+
+```{r}
+count(hg, author_kaggle, sort = TRUE) %>%
+  head(5)
+```
+
+## Visualization
+
+### Ideas
+
+When do the top five contributors show up in the data set?
+
+```{r}
+top_authors <- count(hg, author_kaggle, sort = TRUE) %>%
+  head(5) %>%
+  pull(author_kaggle)
+
+# not the most illuminating idea
+authorship_plot <- hg %>%
+  mutate(
+    author_category = ifelse(author_kaggle %in% top_authors, author_kaggle, "Other"),
+    month = floor_date(date, unit = "month")
+  ) %>%
+  count(month, author_category) %>%
+  ggplot(aes(month, n)) + 
+  geom_bar(aes(fill = author_category), stat = "identity")
+```
+
+Word Cloud
+
+Very useful guide found on [Toward Data Science](https://towardsdatascience.com/create-a-word-cloud-with-r-bde3e7422e8a) on how to make a Word Cloud.
+
+```{r}
+# prepare the corpus
+
+## review vector
+reviews <- hg$review
+
+## create the corpus
+corpus <- Corpus(VectorSource(reviews))
+
+## clean the corpus
+corpus <- corpus %>%
+  tm_map(removeNumbers) %>%
+  tm_map(removePunctuation) %>%
+  tm_map(stripWhitespace)
+
+corpus <- tm_map(corpus, content_transformer(tolower))
+corpus <- tm_map(corpus, removeWords, stopwords("english"))
+```
+
+```{r}
+# create a document term matrix
+dtm <- TermDocumentMatrix(corpus)
+matrix <- as.matrix(dtm)
+words <- sort(rowSums(matrix), decreasing = TRUE)
+df <- data.frame(word = names(words), freq = words)
+```
+
+```{r}
+# generate word cloud
+
+## set seed for reproducibility
+set.seed(1123)
+
+wordcloud(words = df$word, freq = df$freq, min.freg = 1,
+          max.words = 200, random.order = FALSE, rot.per = 0.25,
+          colors = brewer.pal(8, "Dark2"))
+```
+
+```{r}
+wordcloud2(data = df, size = 0.7, shape = "pe ntagon")
+```
+
