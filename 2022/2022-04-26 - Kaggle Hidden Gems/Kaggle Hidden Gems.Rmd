@@ -50,6 +50,9 @@ This data set contains a lot of useful references for authorship and links to fo
 ```{r}
 hg <- hidden_gems %>%
   select(date, author_kaggle, title, review)
+
+hidden_gems %>%
+  filter(!is.na(author_twitter))
 ```
 
 
@@ -88,48 +91,6 @@ Word Cloud
 
 Very useful guide found on [Toward Data Science](https://towardsdatascience.com/create-a-word-cloud-with-r-bde3e7422e8a) on how to make a Word Cloud.
 
-```{r}
-# prepare the corpus
-
-## review vector
-reviews <- hg$review
-
-## create the corpus
-corpus <- Corpus(VectorSource(reviews))
-
-## clean the corpus
-corpus <- corpus %>%
-  tm_map(removeNumbers) %>%
-  tm_map(removePunctuation) %>%
-  tm_map(stripWhitespace)
-
-corpus <- tm_map(corpus, content_transformer(tolower))
-corpus <- tm_map(corpus, removeWords, stopwords("english"))
-```
-
-```{r}
-# create a document term matrix
-dtm <- TermDocumentMatrix(corpus)
-matrix <- as.matrix(dtm)
-words <- sort(rowSums(matrix), decreasing = TRUE)
-df <- data.frame(word = names(words), freq = words)
-```
-
-```{r}
-# generate word cloud
-
-## set seed for reproducibility
-set.seed(1123)
-
-review_cloud <- wordcloud(words = df$word, freq = df$freq, min.freg = 1,
-          max.words = 200, random.order = FALSE, rot.per = 0.25,
-          colors = brewer.pal(8, "Dark2"))
-```
-
-```{r}
-#wordcloud2(data = df, size = 0.7, shape = "pentagon")
-```
-
 ## Selenium
 
 Need to `install.packages("RSelenium")` and to have JAVA installed on the local machine (a useful tutorial for downloading JAVA is provided by [ProgrammingKnowledge](https://www.youtube.com/watch?v=IJ-PJbvJBGs)).
@@ -150,22 +111,155 @@ driver <- rsDriver(browser = "chrome",
 
 ## create client object
 remDr <- driver$client
+
+remDr$close()
 ```
 
 ```{r}
-test_url <- hidden_gems$notebook[1]
-tweet <- hidden_gems$author_twitter[1]
+# define function for waiting for page to load
+wetest <- function(using = 'css',element = 'body',sleepmin,sleepmax){
+  remDr <- get("remDr",envir=globalenv())
+  webElemtest <-NULL
+  while(is.null(webElemtest)){
+    webElemtest <- tryCatch({remDr$findElement(using = using, element)},
+                            error = function(e){NULL})
+    #loop until element with name <value> is found in <webpage url>
+  }
+  randsleep <- sample(seq(sleepmin, sleepmax, by = 0.001), 1)
+  Sys.sleep(randsleep)
+}
+
+remDr$navigate(kaggle)
+wetest(sleepmin = 0.5, sleepmax = 1)
+page_not_found <- '//*[@id="site-content"]/div[3]/div/div'
+page_not_found_test <- "We can't find that page.\nYou can search Kaggle above or visit our homepage."
+remDr$findElement(using = 'xpath', page_not_found)$getElementText()
+```
+
+```{r message=FALSE, warning=FALSE}
+kaggle <- hidden_gems$notebook[15]
+tweet <- hidden_gems$author_twitter[15]
 
 # open browser
 remDr$open()
 
 # go to kaggle link
 remDr$navigate(tweet)
+wetest(sleepmin = 0.5, sleepmax = 1)
 
 # finding elements
-followers_xpath <- remDr$findElement(using = "xpath", '//*[@id="react-root"]/div/div/div[2]/main/div/div/div/div/div/div[2]/div/div/div/div[2]/div[5]/div[2]/a/span[1]/span')
-followers_xpath$getElementAttribute('name')
+
+## twitter
+
+### number of twitter followers
+followers_element <- '//*[@id="react-root"]/div/div/div[2]/main/div/div/div/div[1]/div/div[2]/div/div/div/div/div[5]/div[2]'
+
+# webElem <- NULL
+# while(is.null(webElem)) {
+#   webElem <- tryCatch({remDr$findElement(using = "xpath", followers_element)},
+#                       error = function(e){NULL})
+# }
+
+followers_xpath <- remDr$findElement(using = "xpath", followers_element)
+followers <- followers_xpath$getElementText()
+
+## kaggle
+remDr$navigate(kaggle)
+wetest(sleepmin = 0.5, sleepmax = 1)
+page_exists_xpath <- remDr$findElement(using = 'xpath', '//*[@id="site-content"]/div[3]/div/div')
+page_exists_value <- page_exists_xpath$getElementText()
+
+if (page_exists_value == page_not_found_test) {
+  views <- NULL
+  upvotes <- NULL
+  comments <- NULL
+} else{
+  ### notebook language
+  language_element <- '//*[@id="site-content"]/div[3]/div[3]/div/div[2]/div[1]/span'
+  
+  #### wait for page to load
+  wetest(sleepmin = 0.5, sleepmax = 1)
+  
+  language_xpath <- remDr$findElement(using = "xpath", language_element)
+  language <- language_xpath$getElementText()
+  
+  ### views
+  views_xpath <- remDr$findElement(using = "xpath", '//*[@id="site-content"]/div[3]/div[3]/div/div[1]/span/span[2]')
+  views <- views_xpath$getElementText()
+  
+  ### upvotes
+  upvotes_xpath <- remDr$findElement(using = "xpath", '//*[@id="site-content"]/div[3]/div[3]/div/div[1]/div/div[1]/div/button[2]')
+  upvotes <- upvotes_xpath$getElementText()
+  
+  ### comments
+  comments_xpath <- remDr$findElement(using = "xpath", '//*[@id="site-content"]/div[3]/div[5]/div[1]/div/div/div/button[5]/div')
+  comments <- comments_xpath$getElementText()
+}
+
+paste0("Followers: ", followers, " || Views: ", views, " || Upvotes: ", upvotes, " || Comments: ", comments)
 
 remDr$close()
+```
+
+```{r}
+# twitter identifiers
+twitter_loaded <- remDr$findElement(using = 'xpath', '//*[@id="react-root"]/div/div/div[2]/header/div/div/div/div')
+twitter_loaded$getElementText()
+
+head(list(hidden_gems$author_twitter)[[1]], 5)
+```
+
+
+```{r message=FALSE, warning=FALSE}
+# open browser
+
+# iterate over each row of the hidden_gems df
+selenium_df <- NULL
+#for (row in 1:nrow(hidden_gems)) {
+for (tweet in head(list(hidden_gems$author_twitter)[[1]], 2)) {
+  remDr$open()
+  
+  # define relevant URLs
+  tweet <- hidden_gems[row, "author_twitter"]
+  # kaggle <- hidden_gems[row, "notebook"]
+  
+  # retrieve data from twitter
+  if (!is.na(tweet)) {
+    ## navigate to twitter page and wait for it to load
+    remDr$navigate(tweet)
+    wetest(using = twitter_loaded, element = '//*[@id="react-root"]/div/div/div[2]/header/div/div/div/div', sleepmin = 0.5, sleepmax = 1)
+
+    ## retrieve number of twitter followers
+    followers_element <- '//*[@id="react-root"]/div/div/div[2]/main/div/div/div/div[1]/div/div[2]/div/div/div/div/div[5]/div[2]'
+
+    ## wait for web page to load
+    # webElem <- NULL
+    # while(is.null(webElem)) {
+    #   webElem <- tryCatch({remDr$findElement(using = "xpath", followers_element)},
+    #                       error = function(e){NULL})
+    # }
+
+    followers_xpath <- remDr$findElement(using = "xpath", followers_element)
+    followers <- followers_xpath$getElementText()
+    
+    followers <- "NOT NULL"
+  } else {
+    followers <- 'NULL'
+  }
+  
+  # retrieve data from kaggle
+  
+  # output to new dataframe
+  output <- c(tweet, followers)
+  print(output)
+  #selenium_df <- rbind(selenium_df, output)
+  
+  remDr$close()
+}
+
+#colnames(selenium_df) <- c("author_twitter", "notebook", "followers")
+#selenium_df
+
+output
 ```
 
