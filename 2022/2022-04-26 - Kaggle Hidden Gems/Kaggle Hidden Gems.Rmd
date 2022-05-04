@@ -129,11 +129,8 @@ wetest <- function(using = 'css',element = 'body',sleepmin,sleepmax){
   Sys.sleep(randsleep)
 }
 
-remDr$navigate(kaggle)
-wetest(sleepmin = 0.5, sleepmax = 1)
 page_not_found <- '//*[@id="site-content"]/div[3]/div/div'
 page_not_found_test <- "We can't find that page.\nYou can search Kaggle above or visit our homepage."
-remDr$findElement(using = 'xpath', page_not_found)$getElementText()
 ```
 
 ```{r message=FALSE, warning=FALSE}
@@ -206,60 +203,54 @@ remDr$close()
 twitter_loaded <- remDr$findElement(using = 'xpath', '//*[@id="react-root"]/div/div/div[2]/header/div/div/div/div')
 twitter_loaded$getElementText()
 
-head(list(hidden_gems$author_twitter)[[1]], 5)
+test_tweets <- head(list(hidden_gems$author_twitter)[[1]], 3)
+twitter_profiles <- hidden_gems %>%
+  filter(!is.na(author_twitter)) %>%
+  pull(author_twitter)
+
+account_does_not_exist <- "https://twitter.com/CaptCalculator"
+does_not_exist_xpath <- ""
 ```
 
-
 ```{r message=FALSE, warning=FALSE}
-# open browser
-
 # iterate over each row of the hidden_gems df
 selenium_df <- NULL
-#for (row in 1:nrow(hidden_gems)) {
-for (tweet in head(list(hidden_gems$author_twitter)[[1]], 2)) {
-  remDr$open()
+
+for (profile in twitter_profiles) {
   
-  # define relevant URLs
-  tweet <- hidden_gems[row, "author_twitter"]
+  # # define relevant URLs
+  # tweet <- hidden_gems[row, "author_twitter"]
   # kaggle <- hidden_gems[row, "notebook"]
   
+  remDr$open()
+  Sys.sleep(3)
+  
   # retrieve data from twitter
-  if (!is.na(tweet)) {
-    ## navigate to twitter page and wait for it to load
-    remDr$navigate(tweet)
-    wetest(using = twitter_loaded, element = '//*[@id="react-root"]/div/div/div[2]/header/div/div/div/div', sleepmin = 0.5, sleepmax = 1)
-
+  if (!is.na(profile)) {
+    # navigate to twitter page and wait for it to load
+    remDr$navigate(profile)
+    Sys.sleep(3)
+  
+    # NEED TO ADD AN ADDITIONAL IF STATEMENT FOR WHETHER THE PAGE EXISTS
+    
     ## retrieve number of twitter followers
     followers_element <- '//*[@id="react-root"]/div/div/div[2]/main/div/div/div/div[1]/div/div[2]/div/div/div/div/div[5]/div[2]'
 
-    ## wait for web page to load
-    # webElem <- NULL
-    # while(is.null(webElem)) {
-    #   webElem <- tryCatch({remDr$findElement(using = "xpath", followers_element)},
-    #                       error = function(e){NULL})
-    # }
-
     followers_xpath <- remDr$findElement(using = "xpath", followers_element)
     followers <- followers_xpath$getElementText()
-    
-    followers <- "NOT NULL"
   } else {
     followers <- 'NULL'
   }
   
-  # retrieve data from kaggle
-  
   # output to new dataframe
-  output <- c(tweet, followers)
+  output <- c(author_twitter = profile, followes = followers)
   print(output)
-  #selenium_df <- rbind(selenium_df, output)
+  selenium_df <- rbind(selenium_df, output)
   
   remDr$close()
 }
 
-#colnames(selenium_df) <- c("author_twitter", "notebook", "followers")
-#selenium_df
-
-output
+colnames(selenium_df) <- c("author_twitter", "followers")
+selenium_df
 ```
 
