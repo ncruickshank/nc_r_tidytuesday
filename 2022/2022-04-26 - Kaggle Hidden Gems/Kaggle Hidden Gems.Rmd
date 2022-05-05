@@ -201,29 +201,51 @@ remDr$close()
 ```{r}
 # twitter identifiers
 twitter_loaded <- remDr$findElement(using = 'xpath', '//*[@id="react-root"]/div/div/div[2]/header/div/div/div/div')
-twitter_loaded$getElementText()
+#twitter_loaded$getElementText()
 
 test_tweets <- head(list(hidden_gems$author_twitter)[[1]], 3)
 twitter_profiles <- hidden_gems %>%
-  filter(!is.na(author_twitter)) %>%
+  filter(
+    !is.na(author_twitter),
+    !str_detect(author_twitter, "linkedin")
+  ) %>%
+  mutate(
+    author_twitter = ifelse(
+      str_detect(author_twitter, "twitter"),
+      author_twitter,
+      paste0("https://twitter.com/", author_twitter)
+    )
+  ) %>%
   pull(author_twitter)
 
 account_does_not_exist <- "https://twitter.com/CaptCalculator"
-does_not_exist_xpath <- ""
+problem_profile <- 'https://twitter.com/jiweiliu'
 ```
+
+```{r}
+# twitter values
+does_not_exist_xpath <- '//*[@id="react-root"]/div/div/div[2]/main/div/div/div/div/div/div[2]/div/div/div[2]'
+followers_element <- '//*[@id="react-root"]/div/div/div[2]/main/div/div/div/div[1]/div/div[2]/div/div/div/div/div[5]/div[2]'
+```
+
+```{r}
+remDr$open()
+remDr$navigate(problem_profile)
+try(remDr$findElement(using = 'xpath', followers_element))
+```
+
+
 
 ```{r message=FALSE, warning=FALSE}
 # iterate over each row of the hidden_gems df
 selenium_df <- NULL
+remDr$open()
 
 for (profile in twitter_profiles) {
   
-  # # define relevant URLs
-  # tweet <- hidden_gems[row, "author_twitter"]
-  # kaggle <- hidden_gems[row, "notebook"]
-  
-  remDr$open()
-  Sys.sleep(3)
+  # remDr$open()
+  #Sys.sleep(3)
+  wetest(sleepmin = 0.5, sleepmax = 1)
   
   # retrieve data from twitter
   if (!is.na(profile)) {
@@ -232,12 +254,19 @@ for (profile in twitter_profiles) {
     Sys.sleep(3)
   
     # NEED TO ADD AN ADDITIONAL IF STATEMENT FOR WHETHER THE PAGE EXISTS
-    
-    ## retrieve number of twitter followers
-    followers_element <- '//*[@id="react-root"]/div/div/div[2]/main/div/div/div/div[1]/div/div[2]/div/div/div/div/div[5]/div[2]'
-
-    followers_xpath <- remDr$findElement(using = "xpath", followers_element)
-    followers <- followers_xpath$getElementText()
+    exists_test <- try(remDr$findElement(using = "xpath", does_not_exist_xpath)$getElementText())
+    if (str_detect(exists_test, "This account doesn’t exist\nTry searching for another.") == TRUE) {
+      followers <- 'Page Not Found'
+    } else {
+      ## retrieve number of twitter followers
+      wetest(using = "xpath", element = followers_element, sleepmin = 0.5, sleepmax = 1)
+      followers_xpath <- try(remDr$findElement(using = "xpath", followers_element))
+      if (str_detect(followers_xpath$getElementText(), "Followers") == TRUE) {
+        followers <- followers_xpath$getElementText()
+      } else {
+        followers <- 'NULL'
+      }
+    }
   } else {
     followers <- 'NULL'
   }
@@ -247,10 +276,18 @@ for (profile in twitter_profiles) {
   print(output)
   selenium_df <- rbind(selenium_df, output)
   
-  remDr$close()
+  # remDr$close()
 }
 
+remDr$close()
 colnames(selenium_df) <- c("author_twitter", "followers")
-selenium_df
+sel_twitter <- selenium_df %>%
+  as.data.frame() %>%
+  mutate(
+    author_twitter = unlist(author_twitter),
+    followers = unlist(followers)
+  )
+
+sel_twitter
 ```
 
