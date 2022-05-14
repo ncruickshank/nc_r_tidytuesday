@@ -1,37 +1,80 @@
----
-title: "NY Times Best Sellers"
-author: "Nick Cruickshank"
-date: "5/12/2022"
-output: github_document
----
-
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
+NY Times Best Sellers
+================
+Nick Cruickshank
+5/12/2022
 
 # Analysis
 
-```{r}
+``` r
 # library
 library(glue)
+```
+
+    ## Warning: package 'glue' was built under R version 4.1.3
+
+``` r
 library(ggtext)
 library(lubridate)
+```
+
+    ## 
+    ## Attaching package: 'lubridate'
+
+    ## The following objects are masked from 'package:base':
+    ## 
+    ##     date, intersect, setdiff, union
+
+``` r
 library(showtext)
+```
+
+    ## Loading required package: sysfonts
+
+    ## Loading required package: showtextdb
+
+``` r
 library(sysfonts)
 library(tidyverse)
 ```
 
-```{r}
+    ## -- Attaching packages --------------------------------------- tidyverse 1.3.1 --
+
+    ## v ggplot2 3.3.5     v purrr   0.3.4
+    ## v tibble  3.1.6     v dplyr   1.0.7
+    ## v tidyr   1.1.4     v stringr 1.4.0
+    ## v readr   2.1.1     v forcats 0.5.1
+
+    ## -- Conflicts ------------------------------------------ tidyverse_conflicts() --
+    ## x lubridate::as.difftime() masks base::as.difftime()
+    ## x lubridate::date()        masks base::date()
+    ## x dplyr::filter()          masks stats::filter()
+    ## x lubridate::intersect()   masks base::intersect()
+    ## x dplyr::lag()             masks stats::lag()
+    ## x lubridate::setdiff()     masks base::setdiff()
+    ## x lubridate::union()       masks base::union()
+
+``` r
 # data
 #nyt_titles <- readr::read_tsv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2022/2022-05-10/nyt_titles.tsv')
 nyt_full <- readr::read_tsv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2022/2022-05-10/nyt_full.tsv')
 ```
 
+    ## Rows: 60386 Columns: 6
+    ## -- Column specification --------------------------------------------------------
+    ## Delimiter: "\t"
+    ## chr  (2): title, author
+    ## dbl  (3): year, rank, title_id
+    ## date (1): week
+    ## 
+    ## i Use `spec()` to retrieve the full column specification for this data.
+    ## i Specify the column types or set `show_col_types = FALSE` to quiet this message.
+
 ## Visual
 
-Pick an author, track their books over time (week over week) to see the rising and falling in rank for each book
+Pick an author, track their books over time (week over week) to see the
+rising and falling in rank for each book
 
-```{r}
+``` r
 nyt_full %>%
   group_by(author, title) %>%
   summarise(
@@ -42,11 +85,28 @@ nyt_full %>%
   head(10)
 ```
 
+    ## `summarise()` has grouped output by 'author'. You can override using the
+    ## `.groups` argument.
+
+    ## # A tibble: 10 x 2
+    ##    author                 n
+    ##    <chr>              <int>
+    ##  1 Danielle Steel       116
+    ##  2 Stuart Woods          63
+    ##  3 Stephen King          54
+    ##  4 Robert B. Parker      47
+    ##  5 John Sandford         44
+    ##  6 David Baldacci        42
+    ##  7 Dean Koontz           40
+    ##  8 Mary Higgins Clark    40
+    ##  9 Sandra Brown          40
+    ## 10 Nora Roberts          38
+
 ### Tracking the Works of Stephen King
 
 For books which showed up for at least 10 or more weeks.
 
-```{r}
+``` r
 # define books which show up for at least 10 weeks
 sk_books <- nyt_full %>%
   filter(author == "Stephen King") %>%
@@ -181,7 +241,12 @@ sk_title_segments <- sk %>%
   ) %>%
   left_join(sk_year_jitter, by = c("title", "year")) %>%
   select(-year_min_week, -year_max_week)
+```
 
+    ## `summarise()` has grouped output by 'title'. You can override using the
+    ## `.groups` argument.
+
+``` r
 sk_weeks_per_book <- nyt_full %>%
   filter(author == "Stephen King") %>%
   count(title)
@@ -194,10 +259,9 @@ sk_title_agg <- sk_title_agg %>%
   mutate(title = str_to_title(title))
 ```
 
-Good annotations
- - The Stand saw a resurgence from 90 - 91.
+Good annotations - The Stand saw a resurgence from 90 - 91.
 
-```{r}
+``` r
 # values
 
 ## season starts
@@ -226,7 +290,7 @@ bottom_rank_color <- "#EE4E4E"
 final_week_color <- "#D6C137"
 ```
 
-```{r Stephen King Best Seller Timeline, fig.height=22, fig.width=10}
+``` r
 ggplot() +
   
   # plot annotations
@@ -317,3 +381,4 @@ ggplot() +
   )
 ```
 
+![](NY-Times-Best-Sellers_files/figure-gfm/Stephen%20King%20Best%20Seller%20Timeline-1.png)<!-- -->
