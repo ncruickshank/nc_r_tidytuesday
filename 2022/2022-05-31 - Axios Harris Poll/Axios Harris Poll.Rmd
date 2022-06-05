@@ -1,0 +1,108 @@
+---
+title: "Axios Harris Poll"
+author: "Nick Cruickshank"
+date: "`r Sys.Date()`"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Libraries and Data
+
+```{r}
+# libraries
+library(tidyverse)
+```
+
+```{r}
+# data
+poll <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2022/2022-05-31/poll.csv')
+#reputation <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2022/2022-05-31/reputation.csv')
+```
+
+```{r}
+head(poll)
+```
+# Tidy Data
+
+```{r}
+# top industries in 2022
+top_industries <- poll %>%
+  group_by(industry) %>%
+  summarise(mean_rq = mean(`2022_rq`, na.rm = TRUE)) %>%
+  ungroup() %>%
+  arrange(desc(mean_rq)) %>%
+  head(10)
+```
+
+```{r}
+# transform shape of poll
+
+## retrieve 2022 data and rename
+poll_2022 <- poll %>%
+  select(company, industry, `2022_rank`, `2022_rq`) %>%
+  rename(c(
+    "overall_rank" = "2022_rank",
+    "rq" = "2022_rq"
+  )) %>%
+  mutate(year = 2022) %>%
+  distinct(company, industry, overall_rank, rq, year)
+
+## retrieve not-2022 data and rename
+poll_no_2022 <- poll %>%
+  select(company, industry, year, rank, rq) %>%
+  rename(c("overall_rank" = "rank"))
+
+## join all back together
+poll_long <- rbind(poll_2022, poll_no_2022)
+```
+
+
+# Visualizaiton
+
+## Idea 1
+
+Facet by industry (highest average rating industry at top, going down from there). Within each facet, show the relative industry rank changing year over year using geom_bump().
+
+```{r}
+# there winds up being a lot of sparsity of data
+# very few companies which have rq's consistently each year of the study
+poll_long %>%
+  filter(
+    !is.na(rq),
+    industry %in% top_industries$industry
+  ) %>%
+  group_by(company) %>%
+  mutate(
+    year_count = n(),
+    min_year = min(year),
+    max_year = max(year),
+    duration = max_year - min_year
+  ) %>%
+  ungroup() %>%
+  filter(year_count == duration) %>%
+  arrange(industry)
+```
+
+
+## Idea 2 - Rankings Over Time By Industry
+
+Also include a graph along side which details the best companies (as of 2022) by industry.
+
+```{r}
+poll_long %>%
+  group_by(industry, year) %>%
+  summarise(
+    companies = n_distinct(company),
+    mean_rq = mean(rq, na.rm = TRUE)
+  ) %>%
+  ungroup()
+```
+
+
+
+
+
+
