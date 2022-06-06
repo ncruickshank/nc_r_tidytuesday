@@ -1,34 +1,56 @@
----
-title: "Axios Harris Poll"
-author: "Nick Cruickshank"
-date: "`r Sys.Date()`"
-output: github_document
----
-
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
+Axios Harris Poll
+================
+Nick Cruickshank
+2022-06-05
 
 # Libraries and Data
 
-```{r}
+``` r
 # libraries
 library(ggbump)
 library(ggtext)
 library(sysfonts)
 library(showtext)
+```
+
+    ## Loading required package: showtextdb
+
+``` r
 library(tidyverse)
 ```
 
-```{r}
+    ## -- Attaching packages --------------------------------------- tidyverse 1.3.1 --
+
+    ## v ggplot2 3.3.5     v purrr   0.3.4
+    ## v tibble  3.1.6     v dplyr   1.0.7
+    ## v tidyr   1.1.4     v stringr 1.4.0
+    ## v readr   2.1.1     v forcats 0.5.1
+
+    ## -- Conflicts ------------------------------------------ tidyverse_conflicts() --
+    ## x dplyr::filter() masks stats::filter()
+    ## x dplyr::lag()    masks stats::lag()
+
+``` r
 # data
 poll <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2022/2022-05-31/poll.csv')
+```
+
+    ## Rows: 500 Columns: 8
+    ## -- Column specification --------------------------------------------------------
+    ## Delimiter: ","
+    ## chr (2): company, industry
+    ## dbl (6): 2022_rank, 2022_rq, change, year, rank, rq
+    ## 
+    ## i Use `spec()` to retrieve the full column specification for this data.
+    ## i Specify the column types or set `show_col_types = FALSE` to quiet this message.
+
+``` r
 #reputation <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2022/2022-05-31/reputation.csv')
 ```
 
 # Tidy Data
 
-```{r}
+``` r
 # top industries in 2022
 top_industries <- poll %>%
   group_by(industry) %>%
@@ -48,7 +70,7 @@ top_industries <- poll %>%
   ) 
 ```
 
-```{r}
+``` r
 # transform shape of poll
 
 ## retrieve 2022 data and rename
@@ -70,19 +92,19 @@ poll_no_2022 <- poll %>%
 poll_long <- rbind(poll_2022, poll_no_2022)
 ```
 
-
 # Visualizaiton
 
-Also include a graph along side which details the best companies (as of 2022) by industry.
+Also include a graph along side which details the best companies (as of
+2022) by industry.
 
-```{r}
+``` r
 # fonts
 f1 <- "Playfair Display"
 font_add_google(f1)
 showtext_auto()
 ```
 
-```{r}
+``` r
 # transform poll for industries
 poll_ranks <- poll_long %>%
   group_by(industry, year) %>%
@@ -98,7 +120,12 @@ poll_ranks <- poll_long %>%
   filter(industry %in% top_industries$industry) %>%
   filter(!is.na(mean_rq)) %>% 
   left_join(top_industries, by = "industry")
+```
 
+    ## `summarise()` has grouped output by 'industry'. You can override using the
+    ## `.groups` argument.
+
+``` r
 # get beginning and ending rq for each industry
 industry_labels <- poll_ranks %>%
   group_by(industry) %>%
@@ -131,7 +158,10 @@ top_cos_2017 <- poll %>%
   select(company, industry)
 ```
 
-```{r Axios Harris Industry Rankings, fig.height=6, fig.width=10, message=FALSE, warning=FALSE}
+    ## Warning in max(rq, na.rm = TRUE): no non-missing arguments to max; returning
+    ## -Inf
+
+``` r
 # plot
 ggplot() + 
   geom_bump(
@@ -193,7 +223,4 @@ ggplot() +
   )
 ```
 
-
-
-
-
+![](Axios-Harris-Poll_files/figure-gfm/Axios%20Harris%20Industry%20Rankings-1.png)<!-- -->
