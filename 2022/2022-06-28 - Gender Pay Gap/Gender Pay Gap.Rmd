@@ -1,0 +1,212 @@
+---
+title: "Gender Pay Gap"
+author: "Nick Cruickshank"
+date: "`r Sys.Date()`"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Load Libraries and Data
+
+```{r}
+# libraries
+library(ggtext)
+library(glue)
+library(showtext)
+library(sysfonts)
+library(tidyverse)
+```
+
+SIC codes were found on the [UK Government website](https://www.gov.uk/government/publications/standard-industrial-classification-of-economic-activities-sic). 
+
+```{r}
+# data
+paygap <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2022/2022-06-28/paygap.csv') %>%
+  janitor::clean_names()
+
+# SIC Codes
+sic_codes <- read_csv("SIC07_CH_condensed_list_en.csv") %>%
+  janitor::clean_names()
+```
+
+```{r}
+paygap %>%
+  head()
+```
+
+# Exploratory Data Analysis
+
+What is the range of data collection?
+
+```{r}
+paste0("Min Data Submitted: ", min(paygap$date_submitted))
+paste0("Max Data Submitted: ", max(paygap$date_submitted))
+```
+
+Are there any employers who are represented more than once? If there are many who show up more than once, we may need to aggregate.
+
+```{r}
+paygap %>%
+  count(current_name, sort = TRUE)
+```
+
+How many different employer sizes are there? If there's a lot, we might be able to linear regression. If there's not, the amount of modeling we can do is limited.
+
+```{r}
+paygap %>%
+  count(employer_size)
+```
+
+How many different SIC codes are represented?
+
+```{r}
+paygap %>%
+  separate_rows(sic_codes, sep = ":") %>%
+  filter(sic_codes != 1, !is.na(sic_codes)) %>%
+  count(sic_codes, sort = TRUE) %>%
+  pull(sic_codes) %>%
+  length()
+```
+
+## Tidy Data
+
+Facet by employer size. What are the industries with the largest average pay gap?
+
+```{r}
+# tidy tuesday
+pg <- paygap %>%
+  filter(!is.na(sic_codes)) %>%
+  
+  # aggregate by employer to collapse all years where data was collected
+  group_by(current_name, employer_size, sic_codes) %>%
+  summarise(percent_gap = mean(diff_mean_hourly_percent, na.rm = TRUE)) %>%
+  ungroup() %>%
+  
+  # separate SIC codes into discrete rows and join in context
+  separate_rows(sic_codes, sep = ":") %>% 
+  rename(c("sic_code" = "sic_codes")) %>%
+  inner_join(sic_codes, by = "sic_code") %>%
+  rename(c("sector" = "description")) %>%
+  
+  # aggregate by sector
+  group_by(sic_code, sector, employer_size) %>%
+  summarise(
+    n_companies = n(),
+    mean_pct_gap = mean(percent_gap, na.rm = TRUE)
+  ) %>%
+  ungroup() %>%
+  
+  # final reshaping, filtering and sorting
+  filter(
+    employer_size != "Not Provided",
+    n_companies >= 3 # has to have at least n companies represented in aggregattion
+  ) %>%
+  mutate(
+    employer_size = factor(
+      employer_size, 
+      levels = c("Less than 250", "250 to 499", "500 to 999", "1000 to 4999", "5000 to 19,999", "20,000 or more")
+      )
+  ) %>%
+  arrange(sector, employer_size, mean_pct_gap)
+```
+
+```{r}
+# further transformation
+
+## top 10 industries where MALES get paid more
+pgm <- pg %>%
+  group_by(employer_size) %>%
+  slice_max(order_by = mean_pct_gap, n = 10, with_ties = FALSE) %>%
+  mutate(
+    gender_rank = row_number(),
+    gender = "Male"
+  )
+
+## top 10 industries where MALES get paid more
+pgf <- pg %>%
+  filter(mean_pct_gap < 0) %>%
+  group_by(employer_size) %>%
+  slice_min(order_by = mean_pct_gap, n = 10, with_ties = FALSE) %>%
+  mutate(
+    gender_rank = row_number(),
+    gender = "Female"
+  )
+
+pg2 <- rbind(pgm, pgf) %>%
+  mutate(abs_gap = abs(mean_pct_gap)) %>%
+  group_by(employer_size) %>%
+  mutate(overall_rank = rank(-abs_gap, ties = "last"))
+```
+
+Based on the row counts in the tibble below, we are going to need to slice the top or bottom n from each employer size.
+
+```{r}
+pg %>%
+  count(employer_size, sort = TRUE)
+```
+
+# Visualize
+
+```{r}
+# values
+
+## font
+f1 <- "EB Garamond"
+font_add_google(f1)
+showtext_auto()
+
+## colors
+male_color <- "#4169E1"
+female_color <- "#DC143C"
+```
+
+```{r Gender Gap by Industry Size, fig.height=9, fig.width=6}
+for (i in unique(pg2$employer_size)) {
+  pg_plot_df <- pg2 %>%
+    filter(employer_size == i) 
+  
+  pg_plot <- pg_plot_df %>%
+    ggplot(aes(abs_gap, overall_rank)) + 
+    
+    # points
+    geom_segment(aes(x = 0, xend = abs_gap, y = overall_rank, yend = overall_rank, color = gender)) + 
+    geom_point(aes(color = gender), size = 2) + 
+    
+    # annotations
+    geom_text(
+      aes(x = 0, y = overall_rank - 0.3, label = paste0(sector, " (n = ", n_companies, ")")), 
+      hjust = 0, size = 3, color = "grey20"
+    ) + 
+    geom_text(
+      aes(x = abs_gap + 1, y = overall_rank, label = paste0(round(abs_gap, 1), "%"), color = gender), 
+      hjust = 0, size = 4
+    ) + 
+    labs(
+      title = glue("Employer Size: {i}"),
+      subtitle = glue("Sectors in the UK with the largest pay gap<br>in favor of <b style='color:{male_color}'>men</b> and <b style='color:{female_color}'>women</b>"),
+      caption = "<br><br>Data Source: <b>UK Gender Pay Gap Services</b> |  Visualization: <b>N. Cruickshank</b> | #TidyTuesday"
+    ) +
+    annotate("text", x = (max(pg_plot_df$abs_gap) + 2.5) / 2, y = 0, label = "Mean % Difference in Pay", fontface = "italic", family = f1, size = 4) +
+    
+    # scales, themes, etc
+    scale_x_continuous(limits = c(0, max(pg_plot_df$abs_gap) + 2.5)) +
+    scale_y_reverse(limits = c(20, 0)) + 
+    scale_color_manual(values = c(
+      "Male" = male_color,
+      "Female" = female_color
+    )) +
+    theme_void(base_family = f1) + 
+    theme(
+      legend.position = "none",
+      plot.title = element_text(hjust = 0.5, size = 18, face = "bold"),
+      plot.subtitle = element_textbox(hjust = 0.5, halign = 0.5, size = 16),
+      plot.caption = element_textbox(hjust = 0.5, size = 8)
+    )
+  
+  print(pg_plot)
+}
+```
+
