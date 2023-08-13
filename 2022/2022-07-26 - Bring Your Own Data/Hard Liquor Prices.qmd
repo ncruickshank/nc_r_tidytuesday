@@ -1,0 +1,251 @@
+---
+title: "Hard Liquor Prices"
+format: html
+editor: visual
+---
+
+## Introduction
+
+Data for this weeks analysis comes from the kaggle dataset for [Iowa Liquor Sales](https://www.kaggle.com/datasets/residentmario/iowa-liquor-sales?resource=download&select=Iowa_Liquor_Sales.csv). Our **objective** is to understand what types of hard liquor are most expensive.
+
+## Import Packages and Data
+
+```{r}
+# libraries
+library(forcats)
+library(ggtext)
+library(janitor)
+library(sysfonts)
+library(showtext)
+library(tidyverse)
+```
+
+```{r}
+# data
+# df <- readr::read_csv("Iowa_Liquor_sales.csv") %>%
+# 
+#   # general tidying
+#   janitor::clean_names() %>%
+#   #select(invoice_item_number, date, category_name, bottles_sold, sale_dollars, volume_sold_liters) %>%
+#   #filter(!is.na(category_name)) %>%
+#   # I don't care about nips (50mL on average) and only care about "regular" sized bottles
+#   filter(bottle_volume_ml >= 750) %>%
+#   mutate(
+#     category_name = str_to_upper(category_name),
+#     # define the most common types of liquor
+#     type = case_when(
+#       str_detect(category_name, "(AMARETTO)") ~ "AMARETTO",
+#       str_detect(category_name, "(BRANDY|BRANDIES)") ~ "BRANDY",
+#       str_detect(category_name, "(BOURBON)") ~ "WHISKY BOURBON",
+#       str_detect(category_name, "(CORDIALS)") ~ "CORDIALS",
+#       str_detect(category_name, "(GIN)") ~ "GIN",
+#       str_detect(category_name, "(RUM)") ~ "RUM",
+#       str_detect(category_name, "(SCHNAPPS)") ~ "SCHNAPPS",
+#       str_detect(category_name, "(SCOTCH)") ~ "WHISKY SCOTCH",
+#       str_detect(category_name, "(TEQUILA)") ~ "TEQUILA",
+#       str_detect(category_name, "(VODKA|VODKAS)") ~ "VODKA",
+#       str_detect(category_name, "(WHISKIES|WHISKY|WHISKEY)") ~ "WHISKY",
+#     ),
+#     # define cost per bottle
+#     sale_dollars = as.numeric(str_remove(sale_dollars, "\\$")),
+#     cost_per_bottle = sale_dollars / bottles_sold,
+# 
+#     # define cost per liter
+#     cost_per_liter = sale_dollars / volume_sold_liters
+#   ) %>%
+#   filter(!is.na(type)) %>%
+#   select(invoice_item_number, item_description, category_name, type, bottles_sold, cost_per_bottle, cost_per_liter)
+# 
+# head(df)
+
+df_agg <- read_csv("Iowa_Liquor_Sales - Aggregated.csv")
+```
+
+```{r}
+font_add_google("Oswald")
+f1 <- "Oswald"
+showtext_auto()
+```
+
+
+## Plotting
+
+```{r}
+# aggregate
+# df_agg <- df %>%
+#   filter(!is.na(cost_per_liter)) %>%
+#   group_by(type) %>%
+#   summarise(
+#     # general statistics
+#     distinct_items = n_distinct(item_description),
+#     bottles_sold = sum(bottles_sold),
+# 
+#     # cost per liter
+#     mean_cost = mean(cost_per_liter, na.rm = TRUE),
+#     median_cost = median(cost_per_liter, na.rm = TRUE),
+#     sd_cost = sd(cost_per_liter, na.rm = TRUE),
+#     iqr_cost = sd(cost_per_liter, na.rm = TRUE),
+#     q2_cost = quantile(cost_per_liter, 0.25),
+#     percentile40_cost = quantile(cost_per_liter, 0.4),
+#     q3_cost = quantile(cost_per_liter, 0.75)
+#   )
+
+# df_agg %>%
+#   write.csv("Iowa_Liquor_Sales - Aggregated.csv")
+```
+
+```{r}
+# how many bottles were sold of the various types?
+df_agg %>%
+  ggplot(aes(distinct_items, fct_reorder(type, distinct_items))) + 
+  geom_bar(stat = "identity") + 
+  labs(
+    title = "Disctinct Products By Liquor Type",
+    x = "Distinct Products"
+  ) + 
+  scale_y_discrete(name = NULL)
+```
+
+Scotch has a MUCH higher number of disctinct products when compared to the amount of bottles sold.
+
+```{r}
+# how many bottles were sold?
+df_agg %>%
+  ggplot(aes(bottles_sold, fct_reorder(type, bottles_sold))) + 
+  geom_bar(stat = "identity") + 
+  labs(
+    title = "Number of Bottles Sold By Liquor Type",
+    subtitle = "Only considering bottles that were 750mL or greater",
+    x = "Number of Bottles Sold"
+  ) + 
+  scale_y_discrete(name = NULL)
+```
+
+```{r fig.height=5, fig.width=13}
+# what is the median price per type
+df_agg2 <- df_agg %>%
+  arrange(desc(median_cost)) %>%
+  mutate(
+    price_rank = row_number(),
+    type = str_replace(str_to_title(type), " ", "\n"),
+    num_sold_cat = case_when(
+      bottles_sold > 10000000 ~ "Greater Than 10",
+      bottles_sold > 7500000 ~ "7.5 to 10",
+      bottles_sold > 5000000 ~ "5 to 7.5",
+      bottles_sold > 2500000 ~ "2.5 to 5",
+      bottles_sold <= 2500000 ~ "Less Than 2.5"
+    ),
+    num_sold_cat = factor(num_sold_cat, levels = c("Less Than 2.5", "2.5 to 5", "5 to 7.5", "7.5 to 10", "Greater Than 10"))
+  ) %>%
+  head(10)
+
+bar_width <- 0.4
+neck_width <- 0.2
+
+plot <- df_agg2 %>%
+  ggplot() +
+  
+  # define the "back of the glass"
+  # geom_rect(
+  #   aes(
+  #     xmin = price_rank - bar_width, xmax = price_rank + bar_width,
+  #     ymin = 0, ymax = q2_cost
+  #   ),
+  #   color = "cornsilk3", alpha = 0.1
+  # ) +
+  # plot the median cost as the neck of the bottle
+  geom_rect(
+    aes(
+      xmin = price_rank - neck_width, xmax = price_rank + neck_width, 
+      ymin = q2_cost, ymax = median_cost
+    ),
+    fill = "wheat1"
+  ) + 
+  # define the body of the bottle as the 2nd quantile
+  geom_rect(
+    aes(
+      xmin = price_rank - bar_width, xmax = price_rank + bar_width, 
+      ymin = 0, ymax = q2_cost
+    ),
+    fill = "wheat1"
+  ) + 
+  ## left side of bottle body
+  geom_linerange(
+    aes(x = price_rank - bar_width, ymin = 0, ymax = q2_cost),
+    color = "cornsilk4", size = 1.2, alpha = 0.8
+  ) +
+  ## left side of bottle neck
+  geom_linerange(
+    aes(x = price_rank - neck_width, ymin = q2_cost, ymax = median_cost),
+    color = "cornsilk4", size = 1.2, alpha = 0.8
+  ) +
+  geom_linerange(
+    aes(xmin = price_rank - bar_width, xmax = price_rank - neck_width, y = q2_cost),
+    color = "cornsilk4", size = 1.2, alpha = 0.8
+  ) + 
+  ## right side of bottle body
+  geom_linerange(
+    aes(x = price_rank + bar_width, ymin = 0, ymax = q2_cost),
+    color = "cornsilk4", size = 1.2, alpha = 0.8
+  ) +
+  ## right side of bottle neck
+  geom_linerange(
+    aes(x = price_rank + neck_width, ymin = q2_cost, ymax = median_cost),
+    color = "cornsilk4", size = 1.2, alpha = 0.8
+  ) +
+  geom_linerange(
+    aes(xmin = price_rank + bar_width, xmax = price_rank + neck_width, y = q2_cost),
+    color = "cornsilk4", size = 1.2, alpha = 0.8
+  ) + 
+  ## base of bottle
+  geom_linerange(
+    aes(xmin = price_rank - bar_width, xmax = price_rank + bar_width, y = 0),
+    color = "cornsilk4", size = 1.2, alpha = 0.8
+  ) +
+  ## top of bottle
+  geom_rect(
+    aes(
+      xmin = price_rank - (neck_width + 0.05), xmax = price_rank + (neck_width + 0.05), 
+      ymin = median_cost * 0.95, ymax = median_cost
+    ),
+    fill = "sienna4"
+  ) + 
+  
+  # labels!
+  geom_text(
+    aes(x = price_rank, y = q2_cost * 0.9, label = type),
+    vjust = 1, color = "sienna4", fontface = "bold", family = f1, size = 6
+  ) + 
+  geom_text(
+    aes(x = price_rank, y = median_cost, label = paste0("$", round(median_cost))),
+    vjust = -1, color = "sienna4", family = f1, size = 6
+  ) +
+  # title
+  annotate("text", x = 10.3, y = 28, label = "How Much Does Hard Liquor Cost?", hjust = 1,
+           family = f1, size = 16, fontface = "bold", color = "sienna4") +
+  annotate("text", x = 10.3, y = 25, label = "Median Cost Per Liter By Liquor Type\nAssuming Bottle Size 750mL Or More",
+           hjust = 1, vjust = 1, family = f1, size = 10, color = "sienna4", lineheight = 0.8) + 
+  annotate("text", x = 10.3, y = 20, label = '"Bottle Neck" reflect range from 25th Percentile to Median', 
+           hjust = 1, vjust = 1, family = f1, size = 6, color = "sienna4", lineheight = 0.8) +
+  labs(
+    caption = "Data Source: <b>kaggle.com/datasets/residentmario/iowa-liquor-sales</b> || Visualization: <b>N. Cruickshank</b> || Data reflects hard liquor sales from retail locations with a Class E Liquor License in Iowa from 2012 to 2017"
+  ) + 
+  
+  # scales, themes, etc.
+  scale_x_continuous(name = NULL, expand = c(0, 0)) +
+  scale_y_continuous(name = "Cost (USD) Per Liter", limits = c(0, 30), expand = c(0,0), labels = function(x) paste0("$", x)) +
+  scale_fill_brewer(palette = "Blues", name = "Bottles Sold (Millions)") + 
+  theme_minimal(base_family = f1) + 
+  theme(
+    panel.grid.minor = element_blank(),
+    panel.grid.major.x = element_blank(),
+    axis.text.x = element_blank(),
+    axis.title.y = element_text(family = f1, color = "sienna4", size = 14),
+    axis.text.y = element_text(family = f1, color = "sienna4", size = 12),
+    plot.caption = element_textbox(family = f1, color = "sienna4", size = 10, hjust = 0)
+  )
+
+# dim 13 x 5
+plot
+```
+

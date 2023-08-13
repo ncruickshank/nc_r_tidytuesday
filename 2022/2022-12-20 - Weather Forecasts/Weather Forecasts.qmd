@@ -1,0 +1,214 @@
+---
+title: "Weather Forecasts"
+author: "Nick Cruickshank"
+format: html
+editor: visual
+---
+
+## Libraries and Packages
+
+```{r}
+# libraries
+library(forecast) # for time series
+library(glue)
+library(ggtext)
+library(lubridate)
+library(sysfonts)
+library(showtext)
+library(tidyr) # for cross joins
+library(tidyverse)
+```
+
+```{r}
+# data
+weather_forecasts <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2022/2022-12-20/weather_forecasts.csv')
+cities <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2022/2022-12-20/cities.csv')
+outlook_meanings <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2022/2022-12-20/outlook_meanings.csv')
+```
+
+```{r}
+# values
+font_add_google("Nanum Gothic")
+f1 <- "Nanum Gothic"
+showtext_auto()
+```
+
+
+## Objective
+
+Does Holt Winters Exponential Smoothing Perform Better Than The Weather Man?
+
+## Tidy
+
+Lets look at Atlanta, GA at the [12, 24, 36] hour forecast windows. At any of those points is Holt Winters better?
+
+```{r}
+# tidy data
+
+## pre slice the data frame
+df <- weather_forecasts %>%
+  filter(
+    possible_error == "none",
+    city == "ATLANTA",
+    state == "GA",
+    forecast_hours_before %in% c(12, 24, 36),
+    !is.na(forecast_temp)
+  )
+```
+
+```{r}
+## set up imputation for missing values
+first_date <- min(df$date)
+n_days <- length(unique(df$date))
+skeleton <- tidyr::crossing(
+  tibble("date" = seq(first_date, by = "day", length.out = n_days)), 
+  tibble("high_or_low" = c("high", "low")),
+  tibble("forecast_hours_before" = c(12,24,36))
+)
+
+## find mean low and high (for actual and forecast) by month for imputation
+imputes <- df %>%
+  mutate(month = month(date)) %>%
+  group_by(month, high_or_low, forecast_hours_before) %>%
+  summarise(
+    mean_observed_temp = mean(observed_temp, na.rm = TRUE),
+    meman_forecast_temp = mean(forecast_temp, na.rm = TRUE)
+  )
+
+## impute missing values
+atl <- skeleton %>%
+  left_join(df, by = c("date", "high_or_low", "forecast_hours_before")) %>%
+  mutate(month = month(date)) %>%
+  left_join(imputes, by = c("month", "high_or_low", "forecast_hours_before")) %>%
+  mutate(
+    actual = ifelse(is.na(observed_temp), mean_observed_temp, observed_temp),
+    forecast = ifelse(is.na(forecast_temp), meman_forecast_temp, forecast_temp)
+  ) %>%
+  select(date, high_or_low, forecast_hours_before, actual, forecast)
+```
+
+## Generate Your Own Forecasts
+
+```{r}
+# generate your own forecasts
+atl2 <- data.frame()
+for (val in c("high", "low")) {
+  for (hour in c(12, 24, 36)) {
+    # extract values
+    df <- atl %>%
+      filter(high_or_low == val, forecast_hours_before == hour) %>%
+      arrange(date)
+
+    # transform actuals to ts
+    dfts <- ts(df$actual, frequency = 365, start = c(2021,30))
+    
+    # create simple exponential smoothing model
+    fit1 <- ses(dfts)
+    alpha <- fit1$model$par[1]
+    
+    # rebind to output
+    df2 <- df %>%
+      cbind(fit1$fitted) %>%
+      rename(c("es_forecast" = "fit1$fitted")) %>%
+      mutate(
+        alpha = alpha,
+        es_forecast = as.numeric(es_forecast)
+      )
+    
+    # paste to central data frame
+    atl2 <- rbind(atl2, df2)
+    rm(dfts, df2)
+  }
+}
+```
+
+```{r}
+# define each models MADs
+mads <- atl2 %>%
+  mutate(
+    forecast_abs_error = abs(actual - forecast),
+    es_abs_error = abs(actual - es_forecast)
+  ) %>%
+  group_by(high_or_low, forecast_hours_before, alpha) %>%
+  summarise(
+    forecast_mad = mean(forecast_abs_error),
+    es_mad = mean(es_abs_error)
+  )
+
+## repaste model params back
+atl3 <- atl2 %>%
+  left_join(mads, by = c("high_or_low", "forecast_hours_before", "alpha"))
+```
+
+## Plot
+
+Preliminary conclusion: Weather forecasts take much more into consideration than simple exponential smoothing (duh).
+
+```{r}
+atl4 <- atl3 %>%
+  pivot_longer(cols = c("actual", "forecast", "es_forecast"), names_to = "source") %>%
+  filter(forecast_hours_before == 36) %>%
+  mutate(month = floor_date(date, unit = "month")) %>%
+  group_by(month, high_or_low, source) %>%
+  summarise(mean_temp = mean(value)) %>%
+  mutate(
+    high_or_low = str_to_title(high_or_low),
+    source = case_when(
+      source == "actual" ~ "Actual",
+      source == "es_forecast" ~ "Simple Exponential Smoothing",
+      source == "forecast" ~ "Official Forecast"
+    )
+  )
+
+# retrieve relevant performance numbers
+atl_es_high_alpha <- filter(mads, high_or_low == "high", forecast_hours_before == 36)$alpha
+atl_es_high_mad <- filter(mads, high_or_low == "high", forecast_hours_before == 36)$es_mad
+atl_forecast_high_mad <- filter(mads, high_or_low == "high", forecast_hours_before == 36)$forecast_mad
+atl_es_low_alpha <- filter(mads, high_or_low == "low", forecast_hours_before == 36)$alpha
+atl_es_low_mad <- filter(mads, high_or_low == "low", forecast_hours_before == 36)$es_mad
+atl_forecast_low_mad <- filter(mads, high_or_low == "low", forecast_hours_before == 36)$forecast_mad
+
+performance_delta <- ((atl_es_high_mad - atl_forecast_high_mad) + (atl_es_low_mad - atl_forecast_low_mad)) / 2
+```
+
+```{r fig.width=10, fig.height=6}
+atl_plot <- atl4 %>%
+  # plot data values
+  ggplot(aes(month, mean_temp)) + 
+  geom_line(aes(color = high_or_low, linetype = source)) + 
+  
+  # annotation
+  labs(
+    title = "Atlanta, GA: Simple Exponential Smoothing (SES) vs Official 36 Hour Weather Forecasts",
+    subtitle = glue("Official Forecasts Are More Accurate Than SES, But Only By Around {round(performance_delta, 1)} Degrees On Average"),
+    caption = glue("Simple Exponential Smoothing chosen since 16 months of data prohibited seasonal indexing.<br>Predictions for Daily Highs: SES (alpha = {round(atl_es_high_alpha, 2)}) Mean Absolute Difference (MAD) = {round(atl_es_high_mad, 2)}; vs Official MAD = {round(atl_forecast_high_mad, 2)}<br>Predictions for Daily Lows: SES (alpha = {round(atl_es_low_alpha, 2)}) = {round(atl_es_low_mad, 2)}; vs Official MAD = {round(atl_forecast_low_mad, 2)}<br>Data Source: <b>USA National Weather Service</b> || Visualization: <b>N. Cruickshank</b>")
+  ) + 
+  
+  # scales, themes, etc
+  scale_x_date(name = "Month", date_breaks = "3 months", date_labels = "%b %Y") +
+  scale_y_continuous(name = "Average Monthly Temperatures") +
+  scale_color_manual(values = c(
+    "High" = "indianred3",
+    "Low" = "deepskyblue"
+  ), name = "Daily Temperature") + 
+  scale_linetype_manual(values = c(
+    "Actual" = "solid",
+    "Official Forecast" = "dotdash",
+    "Simple Exponential Smoothing" = "longdash"
+  )) + 
+  theme_bw(base_family = f1) + 
+  theme(
+    plot.title = element_text(face = "bold", size = 16, hjust = 0.5),
+    plot.subtitle = element_text(face = "italic", size = 16, hjust = 0.5),
+    plot.caption = element_textbox(size = 10, hjust = 0.5, halign = 0.5),
+    panel.grid.minor = element_blank(),
+    panel.grid.major.x = element_blank(),
+    legend.title = element_text(size = 10),
+    legend.text = element_text(size = 10),
+    legend.position = "bottom"
+  )
+
+# dim 1000 x 600
+atl_plot
+```
+
