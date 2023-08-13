@@ -1,0 +1,337 @@
+---
+title: "Hot Ones"
+format: html
+editor: visual
+---
+
+## Import Libraries And Data
+
+```{r libraries}
+library(glue)
+library(showtext)
+library(sysfonts)
+library(patchwork)
+library(tidyverse)
+
+library(tensorflow)
+library(keras)
+library(caret)
+
+library(forecast)
+```
+
+```{r data}
+episodes <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2023/2023-08-08/episodes.csv')
+sauces <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2023/2023-08-08/sauces.csv')
+seasons <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2023/2023-08-08/seasons.csv')
+```
+
+```{r}
+font.add.google("Cormorant", "Cormorant")
+f1 <- "Cormorant"
+showtext_auto()
+```
+
+## Exploratory Analysis
+
+```{r}
+# episodes
+## nothing much to do with guest appearance number
+episodes %>%
+  count(guest_appearance_number)
+```
+
+```{r}
+episodes %>%
+  count(finished)
+```
+
+Could be interesting to see if guests finish the challenge. Mainly looks like that doesn't happen all that often, so would mainly just be a highlight in the visual.
+
+```{r}
+sauces %>%
+  group_by(sauce_number) %>%
+  summarise(
+    mean_scoville = mean(scoville),
+    sd_scoville = sd(scoville)
+  ) %>%
+  ungroup() %>%
+  ggplot(aes(sauce_number, mean_scoville)) + 
+  geom_line() + 
+  geom_point() + 
+  geom_errorbar(
+    aes(ymin = mean_scoville - sd_scoville, ymax = mean_scoville + sd_scoville)
+  ) + 
+  labs(title = "Incremental Sauce Scoville Across All Seasons")
+```
+
+Could be interesting to add up the cumulative (or max) scoville by episode, and plot that over time.
+
+```{r}
+seasons %>%
+  ggplot(aes(season, episodes)) + 
+  geom_line() + 
+  labs(title = "Number of Episodes Per Season")
+```
+
+Nothing much of note here. Looks mainly organizational.
+
+```{r data prep}
+# aggregate across
+sauces_agg <- sauces %>%
+  filter(sauce_number <= 8) %>%
+  group_by(season) %>%
+  summarise(
+    sum_scoville = sum(scoville)
+  )
+
+episodes %>%
+  left_join(sauces_agg, by = "season") %>%
+  ggplot(aes(episode_overall, sum_scoville)) + 
+  geom_line() + 
+  geom_point(aes(color = finished))
+```
+```{r general plotting functions}
+theme_shank <- function() {
+  theme_bw(base_family = f1, base_size = 12) + 
+    theme()
+}
+```
+
+```{r create incremental sauce scoville plot}
+sauces %>%
+  mutate(x = row_number()) %>%
+  ggplot(aes(x, log(scoville))) + 
+  geom_line() + 
+  labs(title = "Time Series Of Log Scoville Sauces")
+```
+
+```{r}
+sauces %>%
+  ggplot(aes(season, scoville)) + 
+  geom_line() + 
+  facet_wrap(~ sauce_number, scales = "free_y") + 
+  labs(title = "Exploration of Sauce Number Variation")
+```
+
+## Preprocess Data
+
+Drawing inspiration from [https://www.kaggle.com/code/rtatman/beginner-s-intro-to-rnn-s-in-r](https://www.kaggle.com/code/rtatman/beginner-s-intro-to-rnn-s-in-r)
+
+```{r extract univariate value}
+sco <- sauces %>%
+  arrange(season, sauce_number) %>%
+  pull(scoville) %>%
+  log() # log transform for better performance
+
+acf(sco)
+```
+
+# Train ARIMA Model
+
+```{r split the data into train and test}
+test_seasons <- 2
+s <- max(sauces$sauce_number)
+train <- sauces %>%
+  filter(season <= max(sauces$season) - test_seasons) %>%
+  pull(scoville) %>%
+  log() %>%
+  ts(frequency = s)
+
+test <- sauces %>%
+  filter(season > max(sauces$season) - test_seasons) %>%
+  pull(scoville) %>%
+  log() %>%
+  ts(frequency = s, start = c(20, 1))
+```
+
+```{r build arima model}
+mod <- auto.arima(
+  y = train,
+  seasonal = TRUE,
+  ic = "aic", # ideally "aicc" but whatever
+  trace = TRUE
+)
+
+summary(mod)
+```
+
+```{r predict next two seasons and define MAPE}
+calc_mape <- function(actual, pred) {
+  x <- mean(abs(actual - pred) / actual)
+  x
+}
+
+mod_pred <- mod %>%
+  predict(test_seasons * s)
+
+mod_mape <- calc_mape(test, mod_pred$pred)
+```
+
+```{r recompile data for plotting}
+# assumption panel
+conf_lvl <- 1.96
+min_season_to_show <- 12
+
+# stitch forecasts together
+pred_df <- tibble(
+  "season" = c(rep(20, 10), rep(21,10)),
+  "sauce_number" = c(rep(seq(1, 10), 2)),
+  "pred_log_scoville" = mod_pred$pred,
+  "pred_log_scoville_se" = mod_pred$se
+)
+
+df <- sauces %>%
+  mutate(
+    log_scoville = log(scoville),
+    cumulative_season_sauce_count = (10 * season) + sauce_number
+  ) %>%
+  left_join(pred_df, by = c("season", "sauce_number")) %>%
+  mutate(
+    ymin = pred_log_scoville - (conf_lvl * pred_log_scoville_se),
+    ymax = pred_log_scoville + (conf_lvl * pred_log_scoville_se)
+  ) %>%
+  filter(
+    season >= min_season_to_show
+  )
+```
+
+```{r}
+theme_shank <- function() {
+  theme_bw(base_size = 16, base_family = f1) + 
+  theme(
+    plot.title = element_text(family = f1, face = "bold", color = "firebrick4"),
+    panel.grid.minor.y = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank()
+  )
+}
+```
+
+
+```{r plot, fig.width = 10, fig.height = 4}
+fig1 <- ggplot(df, aes(x = cumulative_season_sauce_count, y = log_scoville)) + 
+  # show actuals
+  geom_line() + 
+  # show predictions
+  geom_ribbon(
+    aes(ymin = ymin, ymax = ymax),
+    fill = "firebrick1", alpha = 0.2
+  ) + 
+  geom_line(
+    aes(cumulative_season_sauce_count, pred_log_scoville), 
+    color = "firebrick3", size = 2, linetype = "dashed"
+  ) + 
+  # scales, themes, etc
+  labs(
+    title = "Hot Ones - Predicting Log Scoville Units For The Season",
+    subtitle = glue("MAPE of {round(mod_mape * 100, 2)}% Achieved with an ARIMA(2,1,2)(2,1,1)[10] Model"),
+    x = "Season - Sauce Number",
+    y = "Log Scoville"
+  ) +
+  scale_x_continuous(breaks = seq(121, 211, 10)) + 
+  theme_shank()
+
+# dim 800 x 450
+fig1
+```
+
+
+```{r}
+fig2 <- sauces %>%
+  ggplot(aes(season, log(scoville))) + 
+  geom_line() + 
+  facet_wrap(~ sauce_number, ncol = 5) + 
+  labs(
+    title = "Log Scoville By Sauce Number Over Time",
+    subtitle = "At least for the early sauces, there is variation over time",
+    x = "Season",
+    y = "Log Scoville"
+  ) + 
+  theme_shank()
+
+fig2
+```
+
+
+# Graveyard Of Attempted RNN
+
+```{r reshape the data}
+# # assumption panel
+# max_len <- 10
+# batch_size <- 20
+# total_epochs <- 15
+# 
+# set.seed(20230813)
+# 
+# # cut the endog in overlapping sample sequence of max_len
+# 
+# ## get list of start indexes for our chunks
+# start_indexes <- seq(1, length(sco) - (max_len + 1), by = 3)
+# 
+# ## create empty matrix to store data, then fill it out
+# sco_mat <- matrix(nrow = length(sco), ncol = max_len + 1)
+# for (i in 1:length(start_indexes)) {
+#   sco_mat[i,] <- sco[start_indexes[i]:(start_indexes[i] + max_len)]
+# }
+# 
+# ## clean the matrix
+# sco_mat <- sco_mat * 1 # ensure numeric dtype
+# if(anyNA(sco_mat)) {
+#   sco_mat <- na.omit(sco_mat)
+# }
+```
+
+```{r split data into train, test}
+# # separate dependent and independent data
+# X <- sco_mat[, -ncol(sco_mat)]
+# y <- sco_mat[, ncol(sco_mat)]
+# 
+# # train test split
+# training_index <- createDataPartition(y, p = (19 / 21), list = FALSE, times = 1)
+# X_train <- array(X[training_index,], dim = c(length(training_index), max_len, 1))
+# y_train <- y[training_index]
+# X_test <- array(X[-training_index,], dim = c(length(y) - length(training_index), max_len, 1))
+# y_test <- y[-training_index]
+```
+
+```{r define model architecture}
+# mod <- keras_model_sequential()
+# mod %>%
+#   layer_dense(
+#     input_shape = dim(X_train)[2:3], 
+#     units = max_len
+#   ) %>%
+#   layer_simple_rnn(
+#     units = 5
+#   ) %>%
+#   layer_dense(
+#     units = 1,
+#     activation = "sigmoid"
+#   )
+# 
+# summary(mod)
+```
+
+```{r compile model}
+# mod %>%
+#   compile(
+#     loss = "mean_squared_error",
+#     optimizer = "adam",
+#     metrics = c("mean_squared_error")
+#   )
+```
+
+```{r train model}
+# trained_mod <- mod %>%
+#   fit(
+#     x = X_train,
+#     y = y_train,
+#     batch_size = batch_size,
+#     epochs = total_epochs,
+#     validation_split = 0.1
+#   )
+```
+
+
+

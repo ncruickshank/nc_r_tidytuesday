@@ -1,0 +1,77 @@
+---
+title: "Egg Production"
+format: html
+editor: visual
+---
+
+## Introduction
+
+This weeks [Tidy Tuesday Project](https://github.com/rfordatascience/tidytuesday/blob/master/data/2023/2023-04-11/readme.md) is focused on Egg Production in the US. My aim is to explore the Facebook Prophet package, and maybe see how it's forecasts compare against ARIMA methods.
+
+## Import Libraries And Data
+
+```{r libraries}
+# libraries
+library(prophet)
+library(tidyverse)
+```
+
+```{r data}
+# data
+eggproduction  <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2023/2023-04-11/egg-production.csv')
+```
+
+## Exploratory Analysis
+
+```{r}
+eggproduction %>%
+  ggplot(aes(observed_month, n_eggs)) + 
+  geom_bar(aes(fill = prod_type), stat = "identity") + 
+  labs(title = "Egg Production Over Time By Type")
+```
+
+Looks like I can pretty comfortably aggregate both types, or forecast both separately. Also that I should exclude 2021.
+
+## Tidy
+
+```{r}
+df <- eggproduction %>%
+  filter(prod_type == "table eggs") %>%
+  group_by(observed_month) %>%
+  summarise(n_eggs = sum(n_eggs)) %>%
+  ungroup() %>%
+  rename(c(
+    "ds" = "observed_month",
+    "y" = "n_eggs"
+  )) %>%
+  filter(ds < "2021-01-01")
+```
+
+## Prophet Modeling
+
+```{r}
+# build prophet model
+m <- prophet(df)
+```
+
+```{r}
+# define future dates
+future <- make_future_dataframe(m, periods = 12)
+tail(future)
+```
+
+```{r}
+# make forecasts
+forecast <- predict(m, future)
+tail(forecast[c('ds', 'yhat', 'yhat_lower', 'yhat_upper')])
+```
+
+```{r}
+plot(m, forecast)
+```
+
+```{r}
+prophet_plot_components(m, forecast)
+```
+
+
